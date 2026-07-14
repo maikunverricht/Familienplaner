@@ -273,6 +273,7 @@ function datumKeyVonTag(i) { // lokales Datum (JJJJ-MM-TT) des Wochentags i in d
 }
 const formatDatum = k => k ? k.slice(8, 10) + "." + k.slice(5, 7) + "." : "";
 function passtAufTag(t, i) {
+  if (t.ausnahmen && t.ausnahmen.includes(datumKeyVonTag(i))) return false; // einzelner Tag gelöscht
   const wdh = t.wdh || "woechentlich";
   if (wdh === "taeglich") return true;
   if (wdh === "arbeitstage") return i <= 4; // Montag bis Freitag
@@ -356,6 +357,9 @@ try {
       if (a.done && a.doneDatum) a.doneDaten[a.doneDatum] = true;
       delete a.done; delete a.doneDatum;
     }
+  });
+  (state.termine || []).forEach(t => { // doppelte Personen aus altem Fehler bereinigen
+    if (Array.isArray(t.personen)) t.personen = [...new Set(t.personen)];
   });
 } catch (e) { state = standardZustand(); }
 
@@ -464,6 +468,8 @@ function tagesReset() {
   state.aufgaben.forEach(a => {
     if (a.doneDaten) Object.keys(a.doneDaten).forEach(k => { if (k < montag) delete a.doneDaten[k]; });
   });
+  // Abgelaufene Einzeltag-Löschungen von Serienterminen aufräumen
+  state.termine.forEach(t => { if (t.ausnahmen) t.ausnahmen = t.ausnahmen.filter(d => d >= montag); });
   Object.values(state.erinnerungen).forEach(er =>
     Object.values(er).forEach(e => { e.fired = ""; })
   );
@@ -607,22 +613,30 @@ function renderWoche() {
         return `<div class="glass tag-card ${i === heute ? "heute" : ""}" style="--heute:${person("maik") ? person("maik").farbe : "#6d78f2"}">
           <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
           ${!termine.length && !aufg.length ? `<div class="muted" style="padding:4px 2px">Nichts geplant</div>` : ""}
-          ${termine.map(t => renderTermin(t)).join("")}
+          ${termine.map(t => renderTermin(t, i)).join("")}
           ${aufg.length ? `<div class="aufg-trenn">✅ Aufgaben</div>` + aufg.map(a => aufgabeZeile(a, i)).join("") : ""}
         </div>`;
       }).join("")}
     </div>`;
 }
-function kontextZeile(typ, id, label) {
+function kontextZeile(typ, id, label, opts) {
+  opts = opts || {};
   return `<div class="kontext-bar">
     <span class="grow" style="font-weight:800">„${esc(label)}" löschen?</span>
-    <button class="btn rot klein" data-action="loeschen" data-typ="${typ}" data-id="${id}">🗑️ Löschen</button>
+    ${opts.serie
+      ? `<button class="btn rot klein" data-action="loeschen-tag" data-typ="${typ}" data-id="${id}" data-tag="${opts.tag}">🗑️ Nur dieser Tag</button>
+         <button class="btn rot klein" data-action="loeschen" data-typ="${typ}" data-id="${id}">🗑️ Ganze Serie</button>`
+      : `<button class="btn rot klein" data-action="loeschen" data-typ="${typ}" data-id="${id}">🗑️ Löschen</button>`}
     <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
   </div>`;
 }
-function renderTermin(t) {
-  if (ui.kontext && ui.kontext.typ === "termin" && ui.kontext.id === t.id) return kontextZeile("termin", t.id, t.titel);
-  if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id) return terminFormular(t);
+function passtZuTag(eintrag, i) { // Formular/Löschmenü nur auf der angetippten Tageskarte zeigen
+  return !eintrag || eintrag.tag == null || String(eintrag.tag) === String(i);
+}
+function renderTermin(t, i) {
+  if (ui.kontext && ui.kontext.typ === "termin" && ui.kontext.id === t.id && passtZuTag(ui.kontext, i))
+    return kontextZeile("termin", t.id, t.titel, { serie: (t.wdh || "woechentlich") !== "einmalig", tag: i });
+  if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id && passtZuTag(ui.bearbeite, i)) return terminFormular(t);
   const erste = person(t.personen[0]);
   const fahr = [];
   if (t.fahrHin) fahr.push(`🚗 Hin: ${esc(person(t.fahrHin)?.name || "?")}`);
@@ -631,7 +645,7 @@ function renderTermin(t) {
   const wdhPill = wdh === "taeglich" ? `<span class="pill">📆 täglich</span>`
     : wdh === "arbeitstage" ? `<span class="pill">💼 Mo–Fr</span>`
     : wdh === "einmalig" ? `<span class="pill">1️⃣ ${formatDatum(t.datum)}</span>` : "";
-  return `<div class="termin presse" style="--tc:${erste ? erste.farbe : "#9aa"}" data-action="edit" data-press data-typ="termin" data-id="${t.id}">
+  return `<div class="termin presse" style="--tc:${erste ? erste.farbe : "#9aa"}" data-action="edit" data-press data-typ="termin" data-id="${t.id}" data-tag="${i}">
     <div class="hstack" style="gap:6px">
       <span class="zeit">${esc(t.zeit)}</span>
       <span class="titel grow">${esc(t.titel)}</span>
@@ -642,11 +656,12 @@ function renderTermin(t) {
   </div>`;
 }
 function aufgabeZeile(a, tagIdx) {
-  if (ui.kontext && ui.kontext.typ === "aufgabe" && ui.kontext.id === a.id) return kontextZeile("aufgabe", a.id, a.titel);
-  if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id) return aufgabeFormular(a);
+  if (ui.kontext && ui.kontext.typ === "aufgabe" && ui.kontext.id === a.id && passtZuTag(ui.kontext, tagIdx))
+    return kontextZeile("aufgabe", a.id, a.titel);
+  if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id && passtZuTag(ui.bearbeite, tagIdx)) return aufgabeFormular(a);
   const p = person(a.person);
   const done = !!(a.doneDaten && a.doneDaten[datumKeyVonTag(tagIdx)]); // Haken gilt nur für diesen Tag
-  return `<div class="aufg-zeile presse ${done ? "aus" : ""}" data-action="edit" data-press data-typ="aufgabe" data-id="${a.id}">
+  return `<div class="aufg-zeile presse ${done ? "aus" : ""}" data-action="edit" data-press data-typ="aufgabe" data-id="${a.id}" data-tag="${tagIdx}">
     <button class="check k ${done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}" data-tag="${tagIdx}">✔</button>
     <span class="grow ${done ? "durch" : ""}">${esc(a.titel)}</span>
     ${a.wdh === "taeglich" ? `<span class="pill" style="font-size:.6rem">📆</span>` : ""}
@@ -961,7 +976,7 @@ function merken() {
   verlauf.push(s);
   if (verlauf.length > 20) verlauf.shift();
 }
-const MUTIEREND = new Set(["fam-speichern", "sterne-null", "loeschen", "termin-speichern",
+const MUTIEREND = new Set(["fam-speichern", "sterne-null", "loeschen", "loeschen-tag", "termin-speichern",
   "aufgabe-toggle", "aufgabe-speichern", "gerichte-leeren", "schritt-toggle", "schritt-hoch",
   "schritt-speichern", "erinnerung-speichern", "kid-schritt"]);
 
@@ -987,13 +1002,25 @@ const aktionen = {
   "sterne-null": id => { const p = person(id); if (p) p.sterne = 0; speichern(); render(); },
   "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; ui.kontext = null; render(); },
   "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; ui.kontext = null; render(); },
-  "edit": (id, typ) => { ui.bearbeite = { typ, id }; ui.neuFormular = null; ui.kontext = null; render(); },
+  "edit": (id, typ, neu, ev, el) => { ui.bearbeite = { typ, id, tag: el && el.dataset.tag }; ui.neuFormular = null; ui.kontext = null; render(); },
   "loeschen": (id, typ) => {
     if (typ === "termin") state.termine = state.termine.filter(t => t.id !== id);
     if (typ === "aufgabe") state.aufgaben = state.aufgaben.filter(a => a.id !== id);
     if (typ === "schritt") {
       const s = state.routinen[ui.routKind][ui.routSlot];
       state.routinen[ui.routKind][ui.routSlot] = s.filter(x => x.id !== id);
+    }
+    ui.kontext = null;
+    speichern(); render();
+  },
+  "loeschen-tag": (id, typ, neu, ev, el) => { // nur diesen Tag aus der Serie nehmen
+    if (typ === "termin") {
+      const t = state.termine.find(x => x.id === id);
+      if (t) {
+        const key = datumKeyVonTag(parseInt(el && el.dataset.tag, 10) || 0);
+        t.ausnahmen = t.ausnahmen || [];
+        if (!t.ausnahmen.includes(key)) t.ausnahmen.push(key);
+      }
     }
     ui.kontext = null;
     speichern(); render();
@@ -1008,7 +1035,7 @@ const aktionen = {
       tag, wdh, datum,
       zeit: leseWert("tf-zeit") || "12:00",
       titel: leseWert("tf-titel") || "Termin",
-      personen: Array.from(document.querySelectorAll(".tf-person:checked")).map(c => c.value),
+      personen: [...new Set(Array.from(document.querySelectorAll(".tf-person:checked")).map(c => c.value))],
       fahrHin: leseWert("tf-hin"),
       fahrZurueck: leseWert("tf-zurueck")
     };
@@ -1116,11 +1143,11 @@ function pressEnde() { clearTimeout(pressTimer); pressTimer = null; }
 document.addEventListener("pointerdown", ev => {
   const z = ev.target.closest("[data-press]");
   if (!z) return;
-  const typ = z.dataset.typ, id = z.dataset.id;
+  const typ = z.dataset.typ, id = z.dataset.id, tag = z.dataset.tag;
   pressTimer = setTimeout(() => {
     pressTimer = null;
     unterdrueckeKlick = true;
-    ui.kontext = { typ, id };
+    ui.kontext = { typ, id, tag };
     ui.bearbeite = null; ui.neuFormular = null;
     render();
   }, 550);
@@ -1134,7 +1161,7 @@ document.addEventListener("contextmenu", ev => { // Rechtsklick am PC = gleiches
   const z = ev.target.closest("[data-press]");
   if (!z) return;
   ev.preventDefault();
-  ui.kontext = { typ: z.dataset.typ, id: z.dataset.id };
+  ui.kontext = { typ: z.dataset.typ, id: z.dataset.id, tag: z.dataset.tag };
   ui.bearbeite = null; ui.neuFormular = null;
   render();
 });
