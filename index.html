@@ -320,8 +320,8 @@ function standardZustand() {
       { id: uid(), tag: (heuteIdx() + 1) % 7, zeit: "16:00", titel: "Kinderturnen", personen: ["paul"], fahrHin: "regina", fahrZurueck: "regina" }
     ],
     aufgaben: [
-      { id: uid(), titel: "Blumen gießen", person: "regina", tag: heuteIdx(), wdh: "taeglich", datum: "", done: false, doneDatum: "" },
-      { id: uid(), titel: "Müll rausbringen", person: "maik", tag: heuteIdx(), wdh: "woechentlich", datum: "", done: false, doneDatum: "" }
+      { id: uid(), titel: "Blumen gießen", person: "regina", tag: heuteIdx(), wdh: "taeglich", datum: "", doneDaten: {} },
+      { id: uid(), titel: "Müll rausbringen", person: "maik", tag: heuteIdx(), wdh: "woechentlich", datum: "", doneDaten: {} }
     ],
     gerichte: [],
     essen,
@@ -343,12 +343,17 @@ try {
   if (!state.personen) state = standardZustand();
   if (["einkauf", "aufgaben", "routinen"].includes(state.aktiverTab)) state.aktiverTab = "woche";
   if (!state.gerichte) state.gerichte = [];
-  (state.aufgaben || []).forEach(a => { // Altdaten: freq → wdh/tag
+  (state.aufgaben || []).forEach(a => { // Altdaten: freq → wdh/tag, done → doneDaten (pro Tag)
     if (!a.wdh) {
       a.wdh = a.freq === "taeglich" ? "taeglich" : "woechentlich";
       if (typeof a.tag !== "number") a.tag = (new Date().getDay() + 6) % 7;
       a.datum = "";
       delete a.freq;
+    }
+    if (!a.doneDaten) {
+      a.doneDaten = {};
+      if (a.done && a.doneDatum) a.doneDaten[a.doneDatum] = true;
+      delete a.done; delete a.doneDatum;
     }
   });
 } catch (e) { state = standardZustand(); }
@@ -453,8 +458,10 @@ function tagesReset() {
   Object.values(state.routinen).forEach(slots =>
     Object.values(slots).forEach(schritte => schritte.forEach(s => { s.done = false; }))
   );
+  // Alte Tages-Haken (vor Montag dieser Woche) aufräumen – Haken gelten pro Tag
+  const montag = datumKeyVonTag(0);
   state.aufgaben.forEach(a => {
-    if ((a.wdh || "woechentlich") !== "einmalig" && a.done && a.doneDatum !== heute) { a.done = false; a.doneDatum = ""; }
+    if (a.doneDaten) Object.keys(a.doneDaten).forEach(k => { if (k < montag) delete a.doneDaten[k]; });
   });
   Object.values(state.erinnerungen).forEach(er =>
     Object.values(er).forEach(e => { e.fired = ""; })
@@ -599,7 +606,7 @@ function renderWoche() {
           <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
           ${!termine.length && !aufg.length ? `<div class="muted" style="padding:4px 2px">Nichts geplant</div>` : ""}
           ${termine.map(t => renderTermin(t)).join("")}
-          ${aufg.length ? `<div class="aufg-trenn">✅ Aufgaben</div>` + aufg.map(a => aufgabeZeile(a)).join("") : ""}
+          ${aufg.length ? `<div class="aufg-trenn">✅ Aufgaben</div>` + aufg.map(a => aufgabeZeile(a, i)).join("") : ""}
         </div>`;
       }).join("")}
     </div>`;
@@ -631,13 +638,14 @@ function renderTermin(t) {
     ${fahr.length ? `<span class="fahr">${fahr.join(" · ")}</span>` : ""}
   </div>`;
 }
-function aufgabeZeile(a) {
+function aufgabeZeile(a, tagIdx) {
   if (ui.kontext && ui.kontext.typ === "aufgabe" && ui.kontext.id === a.id) return kontextZeile("aufgabe", a.id, a.titel);
   if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id) return aufgabeFormular(a);
   const p = person(a.person);
-  return `<div class="aufg-zeile presse ${a.done ? "aus" : ""}" data-action="edit" data-press data-typ="aufgabe" data-id="${a.id}">
-    <button class="check k ${a.done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}">✔</button>
-    <span class="grow ${a.done ? "durch" : ""}">${esc(a.titel)}</span>
+  const done = !!(a.doneDaten && a.doneDaten[datumKeyVonTag(tagIdx)]); // Haken gilt nur für diesen Tag
+  return `<div class="aufg-zeile presse ${done ? "aus" : ""}" data-action="edit" data-press data-typ="aufgabe" data-id="${a.id}">
+    <button class="check k ${done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}" data-tag="${tagIdx}">✔</button>
+    <span class="grow ${done ? "durch" : ""}">${esc(a.titel)}</span>
     ${a.wdh === "taeglich" ? `<span class="pill" style="font-size:.6rem">📆</span>` : ""}
     ${a.wdh === "einmalig" ? `<span class="pill" style="font-size:.6rem">1️⃣ ${formatDatum(a.datum)}</span>` : ""}
     ${p ? `<span class="pdot" title="${esc(p.name)}" style="background:${p.farbe}"></span>` : ""}
@@ -988,9 +996,13 @@ const aktionen = {
     else Object.assign(state.termine.find(t => t.id === id) || {}, daten);
     ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
   },
-  "aufgabe-toggle": id => {
+  "aufgabe-toggle": (id, typ, neu, ev, el) => {
     const a = state.aufgaben.find(x => x.id === id);
-    if (a) { a.done = !a.done; a.doneDatum = a.done ? heuteKey() : ""; if (a.done) klang("check"); }
+    if (!a) return;
+    const key = datumKeyVonTag(parseInt(el && el.dataset.tag, 10) || 0);
+    a.doneDaten = a.doneDaten || {};
+    if (a.doneDaten[key]) delete a.doneDaten[key];
+    else { a.doneDaten[key] = true; klang("check"); }
     speichern(); render();
   },
   "aufgabe-speichern": (id, typ, neu) => {
@@ -999,7 +1011,7 @@ const aktionen = {
     let tag = parseInt(leseWert("af-tag"), 10) || 0;
     if (wdh === "einmalig") tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
     const daten = { titel: leseWert("af-titel") || "Aufgabe", person: leseWert("af-person"), tag, wdh, datum };
-    if (neu === "true") state.aufgaben.push({ id: uid(), done: false, doneDatum: "", ...daten });
+    if (neu === "true") state.aufgaben.push({ id: uid(), doneDaten: {}, ...daten });
     else Object.assign(state.aufgaben.find(a => a.id === id) || {}, daten);
     ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
   },
@@ -1065,7 +1077,7 @@ document.addEventListener("click", ev => {
   const ziel = ev.target.closest("[data-action]");
   if (!ziel) return;
   const fn = aktionen[ziel.dataset.action];
-  if (fn) fn(ziel.dataset.id, ziel.dataset.typ, ziel.dataset.neu, ev);
+  if (fn) fn(ziel.dataset.id, ziel.dataset.typ, ziel.dataset.neu, ev, ziel);
 });
 
 /* ---------- Langes Drücken = Löschmenü ---------- */
