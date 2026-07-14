@@ -194,7 +194,8 @@ textarea:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
 .tile{aspect-ratio:1/1;perspective:700px;-webkit-tap-highlight-color:transparent}
 .tile-in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.34,1.4,.64,1)}
 .tile.fertig .tile-in{transform:rotateY(180deg)}
-.tile.fertig{animation:huepf .6s ease .35s}
+.tile.fertig{animation:huepf .6s ease .35s;outline:4px solid #4ade80;outline-offset:-2px;border-radius:24px;
+  box-shadow:0 0 22px rgba(74,222,128,.55)}
 @keyframes huepf{0%,100%{transform:translateY(0)}35%{transform:translateY(-16px)}65%{transform:translateY(-5px)}}
 .tface{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:24px;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
@@ -202,8 +203,11 @@ textarea:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
   box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 10px 24px -8px rgba(35,35,70,.3)}
 .tface .temoji{font-size:clamp(2.6rem,9vw,3.6rem)}
 .tface .tlabel{font-size:.78rem;font-weight:900;color:#55556e;padding:0 6px;text-align:center}
-.tface.hinten{transform:rotateY(180deg);background:linear-gradient(160deg,#c9f7d9,#9bedb8);border-color:#d8ffe6}
+.tface.hinten{transform:rotateY(180deg);background:linear-gradient(160deg,#baf5cf,#7fe8a6);border-color:#d8ffe6}
 .tface.hinten .temoji{animation:daumen .5s ease}
+.tface.hinten .tlabel{color:#14652f;font-size:.88rem}
+.t-mini{position:absolute;top:8px;right:9px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;
+  font-size:1.05rem;background:rgba(255,255,255,.85);box-shadow:0 2px 6px rgba(20,80,40,.25)}
 @keyframes daumen{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.3) rotate(8deg)}100%{transform:scale(1)}}
 .kid-exit{position:fixed;bottom:18px;right:18px;width:54px;height:54px;border-radius:50%;font-size:1.4rem;z-index:52;
   display:grid;place-items:center}
@@ -441,8 +445,9 @@ const ui = {
   kindSlot: aktuellerSlot(),
   pinOffen: false,
   pinEingabe: "",
-  bearbeite: null,        // {typ, id}
-  kontext: null,          // {typ, id} – Löschmenü nach langem Drücken
+  bearbeite: null,        // {typ, id, tag, split}
+  kontext: null,          // {typ, id, tag} – Löschmenü nach langem Drücken
+  wahl: null,             // {typ, id, tag} – Frage: nur dieser Tag oder ganze Serie bearbeiten?
   famEditor: false,
   routKind: "emily",
   routSlot: aktuellerSlot(),
@@ -556,7 +561,7 @@ function renderFamEditor() {
       <button class="btn" data-action="fam-speichern">Fertig</button>
     </div>
     <div class="set-block">
-      <div class="hstack" style="margin-bottom:10px"><b>🔁 Routinen &amp; Erinnerungen</b><span class="muted">Schritte je Kind &amp; Tageszeit · Kinder haken im Kindmodus (🚀) ab</span></div>
+      <div class="hstack" style="margin-bottom:10px"><b>🔁 Routinen &amp; Erinnerungen</b><span class="muted">Schritte je Kind &amp; Tageszeit · Abhaken/Zurücknehmen verrechnet die Sterne automatisch (auch im Kindmodus)</span></div>
       ${renderRoutinenTeil()}
     </div>
     <div class="set-block">
@@ -633,10 +638,21 @@ function kontextZeile(typ, id, label, opts) {
 function passtZuTag(eintrag, i) { // Formular/Löschmenü nur auf der angetippten Tageskarte zeigen
   return !eintrag || eintrag.tag == null || String(eintrag.tag) === String(i);
 }
+function wahlZeile(id, tag, titel) {
+  return `<div class="kontext-bar" style="background:rgba(130,170,255,.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 4px 12px -4px rgba(60,90,220,.35)">
+    <span class="grow" style="font-weight:800">„${esc(titel)}" bearbeiten?</span>
+    <button class="btn klein" data-action="edit-tag" data-id="${id}" data-tag="${tag}">📝 Nur dieser Tag</button>
+    <button class="btn klein" data-action="edit-serie" data-id="${id}" data-tag="${tag}">📝 Ganze Serie</button>
+    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+  </div>`;
+}
 function renderTermin(t, i) {
   if (ui.kontext && ui.kontext.typ === "termin" && ui.kontext.id === t.id && passtZuTag(ui.kontext, i))
     return kontextZeile("termin", t.id, t.titel, { serie: (t.wdh || "woechentlich") !== "einmalig", tag: i });
-  if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id && passtZuTag(ui.bearbeite, i)) return terminFormular(t);
+  if (ui.wahl && ui.wahl.typ === "termin" && ui.wahl.id === t.id && passtZuTag(ui.wahl, i))
+    return wahlZeile(t.id, i, t.titel);
+  if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id && passtZuTag(ui.bearbeite, i))
+    return terminFormular(t, ui.bearbeite.split ? { split: true, tag: ui.bearbeite.tag } : null);
   const erste = person(t.personen[0]);
   const fahr = [];
   if (t.fahrHin) fahr.push(`🚗 Hin: ${esc(person(t.fahrHin)?.name || "?")}`);
@@ -670,20 +686,22 @@ function aufgabeZeile(a, tagIdx) {
     ${p ? `<span class="pdot" title="${esc(p.name)}" style="background:${p.farbe}"></span>` : ""}
   </div>`;
 }
-function terminFormular(t) {
+function terminFormular(t, opt) {
+  opt = opt || {};
   const neu = !t;
   t = t || { id: "", tag: heuteIdx(), zeit: "15:00", titel: "", personen: [], fahrHin: "", fahrZurueck: "", wdh: "woechentlich", datum: "" };
   const wdh = t.wdh || "woechentlich";
+  const splitKey = opt.split ? datumKeyVonTag(parseInt(opt.tag, 10) || 0) : "";
   return `<div class="glass card" style="margin-bottom:14px">
     <div class="hstack">
-      <select id="tf-wdh">
+      ${opt.split ? `<span class="pill">1️⃣ Nur dieser Tag · ${formatDatum(splitKey)}</span>` : `<select id="tf-wdh">
         <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
         <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
         <option value="arbeitstage" ${wdh === "arbeitstage" ? "selected" : ""}>💼 Mo–Fr</option>
         <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
       </select>
       <select id="tf-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
-      <input type="date" id="tf-datum" value="${esc(t.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">
+      <input type="date" id="tf-datum" value="${esc(t.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">`}
       <input type="time" id="tf-zeit" value="${esc(t.zeit)}">
       <input type="text" id="tf-titel" class="grow" placeholder="Was steht an?" value="${esc(t.titel)}" style="min-width:150px">
     </div>
@@ -696,7 +714,7 @@ function terminFormular(t) {
       <span class="muted">zurück:</span><select id="tf-zurueck">${personOptionen(t.fahrZurueck, true)}</select>
       <span class="grow"></span>
       <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
-      <button class="btn klein" data-action="termin-speichern" data-id="${t.id}" data-neu="${neu}">Fertig</button>
+      <button class="btn klein" data-action="termin-speichern" data-id="${t.id}" data-neu="${opt.split ? "split" : neu}" ${opt.split ? `data-tag="${opt.tag}"` : ""}>Fertig</button>
     </div>
   </div>`;
 }
@@ -844,10 +862,10 @@ function renderKindmodus() {
       <div class="kid-fortschritt"><div style="width:${prozent}%"></div></div>
       <div class="tile-grid">
         ${schritte.map(s => `
-          <button class="tile ${s.done ? "fertig" : ""}" data-action="kid-schritt" data-id="${s.id}">
+          <button class="tile ${s.done ? "fertig" : ""}" data-action="kid-schritt" data-id="${s.id}" title="${s.done ? "Nochmal tippen = zurücknehmen" : ""}">
             <span class="tile-in">
               <span class="tface"><span class="temoji">${esc(s.emoji)}</span><span class="tlabel">${esc(s.label)}</span></span>
-              <span class="tface hinten"><span class="temoji">👍</span></span>
+              <span class="tface hinten"><span class="t-mini">${esc(s.emoji)}</span><span class="temoji">👍</span><span class="tlabel">Geschafft!</span></span>
             </span>
           </button>`).join("")}
       </div>
@@ -933,6 +951,29 @@ function klang(art) {
     });
   } catch (e) {}
 }
+/* Schritt abhaken/zurücknehmen – Sterne werden dabei fair verrechnet:
+   Abhaken: +1 ⭐ (alles fertig: +3 Bonus) · Zurücknehmen: −1 ⭐ (war alles fertig: −3 Bonus) */
+function setzeSchritt(kindId, slotId, id, feier) {
+  const schritte = state.routinen[kindId] && state.routinen[kindId][slotId];
+  const kind = person(kindId);
+  const s = schritte && schritte.find(x => x.id === id);
+  if (!s || !kind) return;
+  if (!s.done) {
+    s.done = true;
+    kind.sterne = (kind.sterne || 0) + 1;
+    klang("check");
+    if (schritte.every(x => x.done)) {
+      kind.sterne += 3;
+      if (feier) { konfetti(); klang("erinnerung"); }
+    }
+  } else {
+    const warKomplett = schritte.every(x => x.done);
+    s.done = false;
+    kind.sterne = Math.max(0, (kind.sterne || 0) - 1 - (warKomplett ? 3 : 0));
+  }
+  speichern(); render();
+}
+
 let hinweisTimer = null;
 function hinweis(text) {
   const h = $("#hinweis");
@@ -986,7 +1027,7 @@ const MUTIEREND = new Set(["fam-speichern", "sterne-null", "loeschen", "loeschen
 function leseWert(id) { const el = $("#" + id); return el ? el.value.trim() : ""; }
 
 const aktionen = {
-  "tab": id => { state.aktiverTab = id; ui.bearbeite = null; ui.neuFormular = null; ui.kontext = null; speichern(); render(); },
+  "tab": id => { state.aktiverTab = id; ui.bearbeite = null; ui.neuFormular = null; ui.kontext = null; ui.wahl = null; speichern(); render(); },
   "fam-editor": () => { ui.famEditor = !ui.famEditor; render(); },
   "fam-speichern": () => {
     state.personen.forEach(p => {
@@ -1000,9 +1041,31 @@ const aktionen = {
     ui.famEditor = false; speichern(); render();
   },
   "sterne-null": id => { const p = person(id); if (p) p.sterne = 0; speichern(); render(); },
-  "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; ui.kontext = null; render(); },
-  "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; ui.kontext = null; render(); },
-  "edit": (id, typ, neu, ev, el) => { ui.bearbeite = { typ, id, tag: el && el.dataset.tag }; ui.neuFormular = null; ui.kontext = null; render(); },
+  "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; ui.kontext = null; ui.wahl = null; render(); },
+  "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; ui.kontext = null; ui.wahl = null; render(); },
+  "edit": (id, typ, neu, ev, el) => {
+    const tag = el && el.dataset.tag;
+    ui.neuFormular = null; ui.kontext = null;
+    if (typ === "termin") {
+      const t = state.termine.find(x => x.id === id);
+      if (t && (t.wdh || "woechentlich") !== "einmalig") { // Serie → erst fragen
+        ui.wahl = { typ, id, tag };
+        ui.bearbeite = null;
+        render(); return;
+      }
+    }
+    ui.bearbeite = { typ, id, tag };
+    ui.wahl = null;
+    render();
+  },
+  "edit-serie": (id, typ, neu, ev, el) => {
+    ui.bearbeite = { typ: "termin", id, tag: el && el.dataset.tag };
+    ui.wahl = null; render();
+  },
+  "edit-tag": (id, typ, neu, ev, el) => {
+    ui.bearbeite = { typ: "termin", id, tag: el && el.dataset.tag, split: true };
+    ui.wahl = null; render();
+  },
   "loeschen": (id, typ) => {
     if (typ === "termin") state.termine = state.termine.filter(t => t.id !== id);
     if (typ === "aufgabe") state.aufgaben = state.aufgaben.filter(a => a.id !== id);
@@ -1026,7 +1089,28 @@ const aktionen = {
     speichern(); render();
   },
 
-  "termin-speichern": (id, typ, neu) => {
+  "termin-speichern": (id, typ, neu, ev, el) => {
+    if (neu === "split") { // Serientermin: nur diesen Tag ändern → Ausnahme + Einzeltermin
+      const serie = state.termine.find(t => t.id === id);
+      const tagIdx = parseInt(el && el.dataset.tag, 10) || 0;
+      const key = datumKeyVonTag(tagIdx);
+      if (serie) {
+        serie.ausnahmen = serie.ausnahmen || [];
+        if (!serie.ausnahmen.includes(key)) serie.ausnahmen.push(key);
+      }
+      state.termine.push({
+        id: uid(), tag: tagIdx, wdh: "einmalig", datum: key,
+        zeit: leseWert("tf-zeit") || "12:00",
+        titel: leseWert("tf-titel") || "Termin",
+        personen: [...new Set(Array.from(document.querySelectorAll(".tf-person:checked")).map(c => c.value))],
+        fahrHin: leseWert("tf-hin"),
+        fahrZurueck: leseWert("tf-zurueck")
+      });
+      ui.neuFormular = null; ui.bearbeite = null;
+      speichern(); render();
+      hinweis(`📝 Nur der ${formatDatum(key)} wurde geändert – die Serie bleibt wie sie war.`);
+      return;
+    }
     const wdh = leseWert("tf-wdh") || "woechentlich";
     const datum = wdh === "einmalig" ? (leseWert("tf-datum") || datumKeyVonTag(heuteIdx())) : "";
     let tag = parseInt(leseWert("tf-tag"), 10) || 0;
@@ -1071,11 +1155,7 @@ const aktionen = {
   },
   "rout-kind": id => { ui.routKind = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
   "rout-slot": id => { ui.routSlot = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
-  "schritt-toggle": id => {
-    const s = state.routinen[ui.routKind][ui.routSlot].find(x => x.id === id);
-    if (s) { s.done = !s.done; if (s.done) klang("check"); }
-    speichern(); render();
-  },
+  "schritt-toggle": id => setzeSchritt(ui.routKind, ui.routSlot, id, false),
   "schritt-hoch": id => {
     const s = state.routinen[ui.routKind][ui.routSlot];
     const i = s.findIndex(x => x.id === id);
@@ -1110,16 +1190,10 @@ const aktionen = {
   "kind-start": id => { ui.kindmodus = id; ui.kindSlot = aktuellerSlot(); ui.famEditor = false; render(); },
   "kid-slot": id => { ui.kindSlot = id; render(); },
   "kid-schritt": (id, typ, neu, ev) => {
-    const kind = person(ui.kindmodus);
-    const s = state.routinen[kind.id][ui.kindSlot].find(x => x.id === id);
-    if (!s || s.done) return; // Kinder können nichts aus Versehen zurücknehmen
-    s.done = true;
-    kind.sterne = (kind.sterne || 0) + 1;
-    klang("check");
-    if (ev) sternFlug(ev.clientX - 10, ev.clientY - 10);
-    const alle = state.routinen[kind.id][ui.kindSlot];
-    if (alle.every(x => x.done)) { kind.sterne += 3; konfetti(); klang("erinnerung"); }
-    speichern(); render();
+    const s = state.routinen[ui.kindmodus][ui.kindSlot].find(x => x.id === id);
+    const warOffen = s && !s.done;
+    setzeSchritt(ui.kindmodus, ui.kindSlot, id, true);
+    if (warOffen && ev) sternFlug(ev.clientX - 10, ev.clientY - 10);
   },
   "pin-oeffnen": () => { ui.pinOffen = true; ui.pinEingabe = ""; render(); },
   "pin-taste": id => pinTaste(id)
@@ -1148,7 +1222,7 @@ document.addEventListener("pointerdown", ev => {
     pressTimer = null;
     unterdrueckeKlick = true;
     ui.kontext = { typ, id, tag };
-    ui.bearbeite = null; ui.neuFormular = null;
+    ui.bearbeite = null; ui.neuFormular = null; ui.wahl = null;
     render();
   }, 550);
 });
@@ -1162,7 +1236,7 @@ document.addEventListener("contextmenu", ev => { // Rechtsklick am PC = gleiches
   if (!z) return;
   ev.preventDefault();
   ui.kontext = { typ: z.dataset.typ, id: z.dataset.id, tag: z.dataset.tag };
-  ui.bearbeite = null; ui.neuFormular = null;
+  ui.bearbeite = null; ui.neuFormular = null; ui.wahl = null;
   render();
 });
 document.addEventListener("input", ev => {

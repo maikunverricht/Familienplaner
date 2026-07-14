@@ -11,7 +11,7 @@ Interaktiver Familienplaner für Regina, Maik, Emily & Paul — eine einzige HTM
 
 ## Bedienung
 
-Termin, Aufgabe oder Routineschritt **antippen = bearbeiten**, **lange drücken** (oder Rechtsklick) **= Löschmenü** mit Papierkorb. Aufgaben sind Termine ohne Uhrzeit: Sie erscheinen abgetrennt unter den Terminen des Tages und lassen sich pro Tag abhaken. **↩️ oben rechts** macht die letzten Änderungen rückgängig (bis zu 20 Schritte, auch Löschungen).
+Termin, Aufgabe oder Routineschritt **antippen = bearbeiten**, **lange drücken** (oder Rechtsklick) **= Löschmenü** mit Papierkorb. Bei Serienterminen fragt der Planer jeweils, ob nur dieser Tag oder die ganze Serie gemeint ist — Einzeltag-Änderungen lassen die Serie unangetastet. Aufgaben sind Termine ohne Uhrzeit: Sie erscheinen abgetrennt unter den Terminen des Tages und lassen sich pro Tag abhaken. **↩️ oben rechts** macht die letzten Änderungen rückgängig (bis zu 20 Schritte, auch Löschungen).
 
 Unter **⚙️ Einstellungen** (oben rechts): Familie (Namen, Farben, Symbole), Routinen & Erinnerungen je Kind und Tageszeit, Kindmodus-PIN und Geräte-Sync.
 
