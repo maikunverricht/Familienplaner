@@ -6,12 +6,12 @@ Interaktiver Familienplaner für Regina, Maik, Emily & Paul — eine einzige HTM
 
 | Tab | Funktion |
 |---|---|
-| 📅 Woche | Wochenkalender mit Terminen (wöchentlich, täglich oder einmalig mit Datum), Personen-Zuordnung, Fahrdienst (hin/zurück) — plus abhakbare Aufgaben als abgetrennter Bereich in jedem Wochentag |
+| 📅 Woche | Wochenkalender mit Terminen (wöchentlich, täglich, Mo–Fr oder einmalig mit Datum), Personen-Zuordnung, Fahrdienst (hin/zurück) — plus abhakbare Aufgaben als abgetrennter Bereich in jedem Wochentag |
 | 🍽️ Essen | Essensplan (Frühstück/Mittag/Abend) für die ganze Woche — Gerichte werden automatisch als Favoriten gemerkt und wieder vorgeschlagen |
 
 ## Bedienung
 
-Termin, Aufgabe oder Routineschritt **antippen = bearbeiten**, **lange drücken** (oder Rechtsklick) **= Löschmenü** mit Papierkorb. Aufgaben sind Termine ohne Uhrzeit: Sie erscheinen abgetrennt unter den Terminen des Tages und lassen sich abhaken.
+Termin, Aufgabe oder Routineschritt **antippen = bearbeiten**, **lange drücken** (oder Rechtsklick) **= Löschmenü** mit Papierkorb. Aufgaben sind Termine ohne Uhrzeit: Sie erscheinen abgetrennt unter den Terminen des Tages und lassen sich pro Tag abhaken. **↩️ oben rechts** macht die letzten Änderungen rückgängig (bis zu 20 Schritte, auch Löschungen).
 
 Unter **⚙️ Einstellungen** (oben rechts): Familie (Namen, Farben, Symbole), Routinen & Erinnerungen je Kind und Tageszeit, Kindmodus-PIN und Geräte-Sync.
 

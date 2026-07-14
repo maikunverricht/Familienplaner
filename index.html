@@ -275,6 +275,7 @@ const formatDatum = k => k ? k.slice(8, 10) + "." + k.slice(5, 7) + "." : "";
 function passtAufTag(t, i) {
   const wdh = t.wdh || "woechentlich";
   if (wdh === "taeglich") return true;
+  if (wdh === "arbeitstage") return i <= 4; // Montag bis Freitag
   if (wdh === "einmalig") return t.datum === datumKeyVonTag(i);
   return t.tag === i;
 }
@@ -523,6 +524,7 @@ function renderKopf() {
           ${p.kind ? `<span class="stars">⭐ ${p.sterne || 0}</span>` : ""}
           ${p.kind ? `<button class="mini" data-action="kind-start" data-id="${p.id}" title="Kindmodus für ${esc(p.name)} starten">🚀</button>` : ""}
         </span>`).join("")}
+      ${verlauf.length ? `<button class="icon-btn glass" data-action="rueckgaengig" title="Letzte Änderung rückgängig machen">↩️</button>` : ""}
       <span class="pill sync-pill" id="sync-status" title="Geräte-Sync – einstellbar über ⚙️">${syncStatusText()}</span>
       <button class="icon-btn glass" data-action="fam-editor" title="Einstellungen: Familie, Routinen, PIN & Sync">${ui.famEditor ? "✖️" : "⚙️"}</button>
     </div>
@@ -627,6 +629,7 @@ function renderTermin(t) {
   if (t.fahrZurueck) fahr.push(`🏠 Zurück: ${esc(person(t.fahrZurueck)?.name || "?")}`);
   const wdh = t.wdh || "woechentlich";
   const wdhPill = wdh === "taeglich" ? `<span class="pill">📆 täglich</span>`
+    : wdh === "arbeitstage" ? `<span class="pill">💼 Mo–Fr</span>`
     : wdh === "einmalig" ? `<span class="pill">1️⃣ ${formatDatum(t.datum)}</span>` : "";
   return `<div class="termin presse" style="--tc:${erste ? erste.farbe : "#9aa"}" data-action="edit" data-press data-typ="termin" data-id="${t.id}">
     <div class="hstack" style="gap:6px">
@@ -647,6 +650,7 @@ function aufgabeZeile(a, tagIdx) {
     <button class="check k ${done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}" data-tag="${tagIdx}">✔</button>
     <span class="grow ${done ? "durch" : ""}">${esc(a.titel)}</span>
     ${a.wdh === "taeglich" ? `<span class="pill" style="font-size:.6rem">📆</span>` : ""}
+    ${a.wdh === "arbeitstage" ? `<span class="pill" style="font-size:.6rem">💼</span>` : ""}
     ${a.wdh === "einmalig" ? `<span class="pill" style="font-size:.6rem">1️⃣ ${formatDatum(a.datum)}</span>` : ""}
     ${p ? `<span class="pdot" title="${esc(p.name)}" style="background:${p.farbe}"></span>` : ""}
   </div>`;
@@ -660,6 +664,7 @@ function terminFormular(t) {
       <select id="tf-wdh">
         <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
         <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
+        <option value="arbeitstage" ${wdh === "arbeitstage" ? "selected" : ""}>💼 Mo–Fr</option>
         <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
       </select>
       <select id="tf-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
@@ -690,6 +695,7 @@ function aufgabeFormular(a) {
       <select id="af-wdh">
         <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
         <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
+        <option value="arbeitstage" ${wdh === "arbeitstage" ? "selected" : ""}>💼 Mo–Fr</option>
         <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
       </select>
       <select id="af-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === a.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
@@ -946,6 +952,20 @@ function pruefeErinnerungen() {
 }
 
 /* =================================================================
+   RÜCKGÄNGIG – Schnappschuss vor jeder Änderung (max. 20)
+   ================================================================= */
+const verlauf = [];
+function merken() {
+  const s = JSON.stringify(state);
+  if (verlauf[verlauf.length - 1] === s) return;
+  verlauf.push(s);
+  if (verlauf.length > 20) verlauf.shift();
+}
+const MUTIEREND = new Set(["fam-speichern", "sterne-null", "loeschen", "termin-speichern",
+  "aufgabe-toggle", "aufgabe-speichern", "gerichte-leeren", "schritt-toggle", "schritt-hoch",
+  "schritt-speichern", "erinnerung-speichern", "kid-schritt"]);
+
+/* =================================================================
    AKTIONEN (Event-Delegation)
    ================================================================= */
 function leseWert(id) { const el = $("#" + id); return el ? el.value.trim() : ""; }
@@ -1016,6 +1036,12 @@ const aktionen = {
     ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
   },
   "gerichte-leeren": () => { state.gerichte = []; speichern(); render(); hinweis("⭐ Gerichte-Favoriten geleert."); },
+  "rueckgaengig": () => {
+    if (!verlauf.length) return;
+    state = JSON.parse(verlauf.pop());
+    speichern(); render();
+    hinweis("↩️ Letzte Änderung rückgängig gemacht.");
+  },
   "rout-kind": id => { ui.routKind = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
   "rout-slot": id => { ui.routSlot = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
   "schritt-toggle": id => {
@@ -1076,8 +1102,12 @@ document.addEventListener("click", ev => {
   if (unterdrueckeKlick) { unterdrueckeKlick = false; return; }
   const ziel = ev.target.closest("[data-action]");
   if (!ziel) return;
+  if (MUTIEREND.has(ziel.dataset.action)) merken();
   const fn = aktionen[ziel.dataset.action];
   if (fn) fn(ziel.dataset.id, ziel.dataset.typ, ziel.dataset.neu, ev, ziel);
+});
+document.addEventListener("focusin", ev => { // Essensfelder: Stand vor dem Tippen merken
+  if (ev.target.classList && ev.target.classList.contains("essen-feld")) merken();
 });
 
 /* ---------- Langes Drücken = Löschmenü ---------- */
