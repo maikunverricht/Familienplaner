@@ -247,6 +247,18 @@ const heuteKey = () => new Date().toISOString().slice(0, 10);
 const TAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
 const TAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
 const heuteIdx = () => (new Date().getDay() + 6) % 7; // Mo=0
+function datumKeyVonTag(i) { // lokales Datum (JJJJ-MM-TT) des Wochentags i in der aktuellen Woche
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  d.setDate(d.getDate() - heuteIdx() + i);
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+const formatDatum = k => k ? k.slice(8, 10) + "." + k.slice(5, 7) + "." : "";
+function passtAufTag(t, i) {
+  const wdh = t.wdh || "woechentlich";
+  if (wdh === "taeglich") return true;
+  if (wdh === "einmalig") return t.datum === datumKeyVonTag(i);
+  return t.tag === i;
+}
 const SLOTS = [
   { id: "morgens", name: "Morgens", emoji: "☀️" },
   { id: "mittags", name: "Mittags", emoji: "🌤️" },
@@ -357,6 +369,9 @@ function tagesReset() {
   Object.values(state.erinnerungen).forEach(er =>
     Object.values(er).forEach(e => { e.fired = ""; })
   );
+  // Abgelaufene einmalige Termine automatisch entfernen
+  const heuteLokal = datumKeyVonTag(heuteIdx());
+  state.termine = state.termine.filter(t => (t.wdh || "") !== "einmalig" || !t.datum || t.datum >= heuteLokal);
   speichern();
 }
 
@@ -475,7 +490,7 @@ function renderWoche() {
     ${ui.neuFormular === "termin" ? terminFormular(null) : ""}
     <div class="wochengrid">
       ${TAGE.map((tag, i) => {
-        const termine = state.termine.filter(t => t.tag === i).sort((a, b) => a.zeit.localeCompare(b.zeit));
+        const termine = state.termine.filter(t => passtAufTag(t, i)).sort((a, b) => a.zeit.localeCompare(b.zeit));
         return `<div class="glass tag-card ${i === heute ? "heute" : ""}" style="--heute:${person("maik") ? person("maik").farbe : "#6d78f2"}">
           <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
           ${termine.length ? termine.map(t => renderTermin(t)).join("") : `<div class="muted" style="padding:4px 2px">Keine Termine</div>`}
@@ -489,10 +504,14 @@ function renderTermin(t) {
   const fahr = [];
   if (t.fahrHin) fahr.push(`🚗 Hin: ${esc(person(t.fahrHin)?.name || "?")}`);
   if (t.fahrZurueck) fahr.push(`🏠 Zurück: ${esc(person(t.fahrZurueck)?.name || "?")}`);
+  const wdh = t.wdh || "woechentlich";
+  const wdhPill = wdh === "taeglich" ? `<span class="pill">📆 täglich</span>`
+    : wdh === "einmalig" ? `<span class="pill">1️⃣ ${formatDatum(t.datum)}</span>` : "";
   return `<div class="termin" style="--tc:${erste ? erste.farbe : "#9aa"}">
     <div class="hstack" style="gap:6px">
       <span class="zeit">${esc(t.zeit)}</span>
       <span class="titel grow">${esc(t.titel)}</span>
+      ${wdhPill}
       <button class="mini" data-action="edit" data-typ="termin" data-id="${t.id}" title="Bearbeiten">✏️</button>
       <button class="mini rot" data-action="loeschen" data-typ="termin" data-id="${t.id}" title="Löschen">🗑️</button>
     </div>
@@ -502,10 +521,17 @@ function renderTermin(t) {
 }
 function terminFormular(t) {
   const neu = !t;
-  t = t || { id: "", tag: heuteIdx(), zeit: "15:00", titel: "", personen: [], fahrHin: "", fahrZurueck: "" };
+  t = t || { id: "", tag: heuteIdx(), zeit: "15:00", titel: "", personen: [], fahrHin: "", fahrZurueck: "", wdh: "woechentlich", datum: "" };
+  const wdh = t.wdh || "woechentlich";
   return `<div class="glass card" style="margin-bottom:14px">
     <div class="hstack">
-      <select id="tf-tag">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
+      <select id="tf-wdh">
+        <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
+        <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
+        <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
+      </select>
+      <select id="tf-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
+      <input type="date" id="tf-datum" value="${esc(t.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">
       <input type="time" id="tf-zeit" value="${esc(t.zeit)}">
       <input type="text" id="tf-titel" class="grow" placeholder="Was steht an?" value="${esc(t.titel)}" style="min-width:150px">
     </div>
@@ -873,8 +899,12 @@ const aktionen = {
   },
 
   "termin-speichern": (id, typ, neu) => {
+    const wdh = leseWert("tf-wdh") || "woechentlich";
+    const datum = wdh === "einmalig" ? (leseWert("tf-datum") || datumKeyVonTag(heuteIdx())) : "";
+    let tag = parseInt(leseWert("tf-tag"), 10) || 0;
+    if (wdh === "einmalig") tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
     const daten = {
-      tag: parseInt(leseWert("tf-tag"), 10) || 0,
+      tag, wdh, datum,
       zeit: leseWert("tf-zeit") || "12:00",
       titel: leseWert("tf-titel") || "Termin",
       personen: Array.from(document.querySelectorAll(".tf-person:checked")).map(c => c.value),
@@ -962,6 +992,13 @@ document.addEventListener("input", ev => {
     speichern();
   }
 });
+document.addEventListener("change", ev => {
+  if (ev.target.id === "tf-wdh") {
+    const w = ev.target.value, tagSel = $("#tf-tag"), datum = $("#tf-datum");
+    if (tagSel) tagSel.style.display = w === "woechentlich" ? "" : "none";
+    if (datum) datum.style.display = w === "einmalig" ? "" : "none";
+  }
+});
 document.addEventListener("keydown", ev => {
   if (!ui.pinOffen) return;
   if (/^[0-9]$/.test(ev.key)) pinTaste(ev.key);
@@ -974,6 +1011,7 @@ tagesReset();
 render();
 setInterval(pruefeErinnerungen, 30000);
 setInterval(tagesReset, 60000);
+/* Version 1.1 – Termine: wöchentlich / täglich / einmalig */
 </script>
 </body>
 </html>
