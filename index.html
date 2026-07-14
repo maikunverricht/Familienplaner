@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Familienplaner</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* ============ Basis ============ */
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0;padding:0}
+body{
+  font-family:'Nunito',ui-rounded,system-ui,-apple-system,'Segoe UI',sans-serif;
+  color:#2b2b3d;background:#f2efe9;min-height:100vh;
+  overflow-x:hidden;-webkit-font-smoothing:antialiased;
+}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:.95rem;color:inherit}
+::selection{background:rgba(120,120,255,.25)}
+
+/* ============ Hintergrund: Aurora-Blobs + Korn ============ */
+#bg{position:fixed;inset:0;z-index:-2;overflow:hidden}
+.blob{position:absolute;width:46vmax;height:46vmax;border-radius:50%;filter:blur(90px);opacity:.42;transition:background 1s}
+.blob.b1{top:-18vmax;left:-12vmax}
+.blob.b2{top:-14vmax;right:-14vmax}
+.blob.b3{bottom:-20vmax;left:-10vmax}
+.blob.b4{bottom:-16vmax;right:-12vmax}
+#grain{position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ============ Glas-Tokens ============ */
+.glass{
+  background:rgba(255,255,255,.48);
+  -webkit-backdrop-filter:blur(16px) saturate(1.5);backdrop-filter:blur(16px) saturate(1.5);
+  border:1px solid rgba(255,255,255,.65);border-radius:18px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 1px 2px rgba(35,35,70,.05),0 10px 28px -12px rgba(35,35,70,.22);
+}
+.sheet{
+  background:rgba(255,255,255,.55);
+  -webkit-backdrop-filter:blur(22px) saturate(1.6);backdrop-filter:blur(22px) saturate(1.6);
+  border:1px solid rgba(255,255,255,.7);border-radius:26px;
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.9),0 2px 4px rgba(35,35,70,.05),0 24px 60px -20px rgba(35,35,70,.28);
+}
+.float{
+  background:rgba(255,255,255,.72);
+  -webkit-backdrop-filter:blur(28px) saturate(1.7);backdrop-filter:blur(28px) saturate(1.7);
+  border:1px solid rgba(255,255,255,.8);border-radius:24px;
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 6px 12px rgba(35,35,70,.08),0 40px 90px -25px rgba(35,35,70,.4);
+}
+@supports not ((backdrop-filter:blur(4px)) or (-webkit-backdrop-filter:blur(4px))){
+  .glass{background:rgba(255,255,255,.88)}
+  .sheet{background:rgba(255,255,255,.92)}
+  .float{background:rgba(255,255,255,.97)}
+}
+
+/* ============ Layout ============ */
+#app{max-width:1060px;margin:0 auto;padding:clamp(10px,2.5vw,28px)}
+
+/* Kopfbereich */
+.topbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px 20px;margin-bottom:18px}
+.topbar h1{font-size:clamp(1.15rem,3.4vw,1.6rem);font-weight:900;margin:0;letter-spacing:-.02em}
+.topbar .datum{font-size:clamp(.72rem,2vw,.85rem);font-weight:700;color:#6b6b85;margin-top:2px}
+.logo{width:46px;height:46px;border-radius:14px;display:grid;place-items:center;font-size:1.5rem;
+  background:linear-gradient(135deg,rgba(255,255,255,.9),rgba(255,255,255,.4));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 16px -6px rgba(35,35,70,.3)}
+.fam-row{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap;align-items:center}
+.avatar{display:flex;align-items:center;gap:7px;padding:6px 12px 6px 7px;border-radius:999px;font-weight:800;font-size:.82rem;
+  transition:transform .15s ease,box-shadow .15s ease}
+.avatar:hover{transform:translateY(-2px)}
+.avatar .dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:.95rem;
+  box-shadow:inset 0 1px 2px rgba(255,255,255,.6),0 2px 5px rgba(35,35,70,.2)}
+.avatar .stars{font-size:.72rem;color:#8a6d00;background:rgba(255,215,80,.35);border-radius:999px;padding:1px 7px;font-weight:800}
+.icon-btn{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-size:1.05rem;
+  transition:transform .15s,box-shadow .15s}
+.icon-btn:hover{transform:translateY(-2px) scale(1.05)}
+
+/* Karteireiter */
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:0 8px;position:relative;z-index:2}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 4px 14px;
+  border-radius:20px 20px 0 0;font-weight:800;font-size:clamp(.62rem,1.9vw,.85rem);color:#5d5d78;
+  background:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.5);border-bottom:none;
+  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  transition:all .2s ease;position:relative;top:5px}
+.tab .ticon{font-size:clamp(1.05rem,3vw,1.45rem)}
+.tab:hover{top:2px;background:rgba(255,255,255,.45)}
+.tab.aktiv{top:0;color:#2b2b3d;background:rgba(255,255,255,.55);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.9),0 -8px 20px -12px rgba(35,35,70,.18);
+  padding-bottom:19px;margin-bottom:-6px;z-index:3}
+.tabpanel{position:relative;z-index:1;padding:clamp(14px,3vw,26px);border-top-left-radius:0}
+
+/* ============ Karten & Bausteine ============ */
+.panel-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px}
+.panel-title h2{font-size:clamp(1rem,2.6vw,1.25rem);font-weight:900;margin:0}
+.panel-title .sub{font-size:.78rem;font-weight:700;color:#77778f}
+.card{padding:14px 16px;margin-bottom:12px;transition:transform .15s ease,box-shadow .15s ease}
+.card:hover{transform:translateY(-1px)}
+.hstack{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.grow{flex:1 1 auto}
+.muted{color:#77778f;font-size:.8rem;font-weight:700}
+.pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:800;
+  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 1px 3px rgba(35,35,70,.08)}
+.pdot{width:9px;height:9px;border-radius:50%;box-shadow:inset 0 1px 1px rgba(255,255,255,.5)}
+.btn{padding:9px 18px;border-radius:999px;font-weight:800;font-size:.85rem;
+  background:linear-gradient(160deg,#6d78f2,#5560e8);color:#fff;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px -6px rgba(85,96,232,.55);
+  transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 10px 22px -8px rgba(85,96,232,.65)}
+.btn.soft{background:rgba(255,255,255,.6);color:#3c3c55;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 4px 12px -4px rgba(35,35,70,.18)}
+.btn.klein{padding:6px 13px;font-size:.76rem}
+.mini{width:32px;height:32px;border-radius:10px;display:inline-grid;place-items:center;font-size:.88rem;flex:none;
+  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 2px 6px -2px rgba(35,35,70,.2);
+  transition:transform .15s}
+.mini:hover{transform:scale(1.12)}
+.mini.rot:hover{background:rgba(255,120,120,.25)}
+input[type=text],input[type=time],input[type=number],select{
+  padding:8px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.75);outline:none;
+  background:rgba(255,255,255,.65);box-shadow:inset 0 1px 3px rgba(35,35,70,.06);font-weight:700}
+input:focus,select:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
+input[type=color]{width:36px;height:36px;border:none;border-radius:10px;padding:0;background:none;cursor:pointer}
+.check{width:30px;height:30px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:.95rem;color:transparent;
+  background:rgba(255,255,255,.6);box-shadow:inset 0 1px 3px rgba(35,35,70,.12);transition:all .2s ease}
+.check.an{color:#fff;background:linear-gradient(160deg,#4ade80,#22b862);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 10px -3px rgba(34,184,98,.6);
+  animation:pop .3s ease}
+@keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+.durch{text-decoration:line-through;opacity:.5}
+.leer{text-align:center;padding:26px;color:#8a8aa2;font-weight:700;font-size:.88rem}
+
+/* Wochenraster */
+.wochengrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.tag-card{padding:12px 13px}
+.tag-card.heute{outline:2.5px solid var(--heute,#6d78f2);outline-offset:1px}
+.tag-kopf{display:flex;align-items:baseline;gap:8px;margin-bottom:9px}
+.tag-kopf b{font-size:.95rem;font-weight:900}
+.heute-badge{font-size:.62rem;font-weight:900;color:#fff;background:var(--heute,#6d78f2);padding:2px 8px;border-radius:999px;letter-spacing:.04em}
+.termin{padding:9px 11px;border-radius:14px;margin-bottom:7px;background:rgba(255,255,255,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px -3px rgba(35,35,70,.14);border-left:4px solid var(--tc,#9aa)}
+.termin .zeit{font-weight:900;font-size:.78rem;color:#4d4d68}
+.termin .titel{font-weight:800;font-size:.86rem}
+.fahr{font-size:.7rem;font-weight:800;color:#5d5d78;background:rgba(130,180,255,.22);border-radius:8px;padding:2px 8px;display:inline-block;margin-top:4px}
+
+/* Routinen / Kindmodus */
+.slot-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.slot-tab{padding:8px 16px;border-radius:999px;font-weight:800;font-size:.82rem;background:rgba(255,255,255,.45);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px -3px rgba(35,35,70,.15);transition:all .15s}
+.slot-tab.aktiv{background:linear-gradient(160deg,#6d78f2,#5560e8);color:#fff;box-shadow:0 6px 16px -6px rgba(85,96,232,.6)}
+.emoji-input{width:58px;text-align:center;font-size:1.2rem}
+
+#kidmode{position:fixed;inset:0;z-index:50;overflow:auto;
+  background:linear-gradient(180deg,#aee3ff 0%,#d8f0ff 40%,#fdf3d8 100%)}
+.wolke{position:fixed;background:#fff;border-radius:999px;opacity:.85;filter:blur(2px);animation:treiben linear infinite}
+@keyframes treiben{from{transform:translateX(-30vw)}to{transform:translateX(130vw)}}
+.sonne{position:fixed;top:26px;right:34px;width:76px;height:76px;border-radius:50%;
+  background:radial-gradient(circle at 35% 35%,#fff6c9,#ffd75e);box-shadow:0 0 60px 22px rgba(255,215,94,.55);animation:gluehen 4s ease-in-out infinite}
+@keyframes gluehen{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+.kid-inhalt{position:relative;max-width:760px;margin:0 auto;padding:22px 16px 90px}
+.kid-kopf{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px;margin-bottom:16px}
+.kid-kopf .kname{font-size:clamp(1.2rem,4vw,1.7rem);font-weight:900}
+.kid-sterne{margin-left:auto;font-size:clamp(1rem,3vw,1.3rem);font-weight:900;color:#8a6d00;
+  background:linear-gradient(160deg,#fff3c2,#ffe38a);padding:8px 18px;border-radius:999px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 6px 14px -5px rgba(200,160,0,.45)}
+.kid-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.kid-slot{padding:14px 6px;border-radius:20px;text-align:center;font-weight:900;font-size:clamp(.8rem,2.6vw,1rem);
+  background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 16px -6px rgba(35,35,70,.2);transition:all .2s}
+.kid-slot .se{font-size:clamp(1.6rem,5vw,2.2rem);display:block;margin-bottom:2px}
+.kid-slot.aktiv{background:linear-gradient(160deg,#ffffffee,#ffffffbb);transform:scale(1.04);
+  box-shadow:inset 0 1.5px 0 #fff,0 12px 28px -10px rgba(35,35,70,.35);outline:3px solid var(--kc,#6d78f2)}
+.kid-fortschritt{height:16px;border-radius:999px;background:rgba(255,255,255,.55);box-shadow:inset 0 2px 5px rgba(35,35,70,.15);overflow:hidden;margin-bottom:18px}
+.kid-fortschritt>div{height:100%;border-radius:999px;background:linear-gradient(90deg,#4ade80,#22c55e);
+  box-shadow:0 0 12px rgba(74,222,128,.7);transition:width .5s cubic-bezier(.34,1.56,.64,1)}
+.tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:14px}
+.tile{aspect-ratio:1/1;perspective:700px;-webkit-tap-highlight-color:transparent}
+.tile-in{position:relative;width:100%;height:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.34,1.4,.64,1)}
+.tile.fertig .tile-in{transform:rotateY(180deg)}
+.tile.fertig{animation:huepf .6s ease .35s}
+@keyframes huepf{0%,100%{transform:translateY(0)}35%{transform:translateY(-16px)}65%{transform:translateY(-5px)}}
+.tface{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:24px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+  background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.85);
+  box-shadow:inset 0 1.5px 0 rgba(255,255,255,.95),0 10px 24px -8px rgba(35,35,70,.3)}
+.tface .temoji{font-size:clamp(2.6rem,9vw,3.6rem)}
+.tface .tlabel{font-size:.78rem;font-weight:900;color:#55556e;padding:0 6px;text-align:center}
+.tface.hinten{transform:rotateY(180deg);background:linear-gradient(160deg,#c9f7d9,#9bedb8);border-color:#d8ffe6}
+.tface.hinten .temoji{animation:daumen .5s ease}
+@keyframes daumen{0%{transform:scale(0) rotate(-30deg)}70%{transform:scale(1.3) rotate(8deg)}100%{transform:scale(1)}}
+.kid-exit{position:fixed;bottom:18px;right:18px;width:54px;height:54px;border-radius:50%;font-size:1.4rem;z-index:52;
+  display:grid;place-items:center}
+.kid-fertig-banner{margin-top:20px;text-align:center;padding:18px;font-size:clamp(1rem,3.4vw,1.35rem);font-weight:900;color:#1d7a3f;
+  background:linear-gradient(160deg,#d9fbe5,#b6f5cd);border-radius:22px;box-shadow:0 10px 26px -10px rgba(34,197,94,.5);animation:pop .5s ease}
+
+/* PIN-Pad */
+#pin-overlay{position:fixed;inset:0;z-index:60;display:grid;place-items:center;background:rgba(40,40,70,.35);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.pin-box{padding:26px 28px;text-align:center;max-width:320px;width:calc(100vw - 40px)}
+.pin-box h3{margin:0 0 6px;font-weight:900}
+.pin-punkte{display:flex;gap:12px;justify-content:center;margin:14px 0 18px}
+.pin-punkte span{width:16px;height:16px;border-radius:50%;background:rgba(35,35,70,.15);box-shadow:inset 0 1px 3px rgba(35,35,70,.2)}
+.pin-punkte span.voll{background:linear-gradient(160deg,#6d78f2,#5560e8);box-shadow:0 2px 6px rgba(85,96,232,.5)}
+.pin-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.pin-taste{padding:14px 0;border-radius:16px;font-size:1.25rem;font-weight:900;background:rgba(255,255,255,.65);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 4px 10px -4px rgba(35,35,70,.25);transition:transform .1s}
+.pin-taste:active{transform:scale(.92)}
+.pin-box.falsch{animation:schuettel .4s ease}
+@keyframes schuettel{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-10px)}40%,80%{transform:translateX(10px)}}
+
+/* Erinnerungs-Banner & Konfetti & Sterne-Flug */
+#hinweis{position:fixed;top:14px;left:50%;transform:translateX(-50%) translateY(-120px);z-index:70;
+  padding:13px 22px;font-weight:800;font-size:.9rem;display:flex;gap:10px;align-items:center;
+  transition:transform .45s cubic-bezier(.34,1.56,.64,1);max-width:calc(100vw - 30px)}
+#hinweis.sichtbar{transform:translateX(-50%) translateY(0)}
+.konfetti{position:fixed;top:-14px;z-index:80;border-radius:3px;pointer-events:none;animation:fallen linear forwards}
+@keyframes fallen{to{transform:translateY(110vh) rotate(720deg);opacity:.2}}
+.sternflug{position:fixed;z-index:80;font-size:1.5rem;pointer-events:none;animation:flug 1s ease forwards}
+@keyframes flug{0%{transform:translateY(0) scale(.6);opacity:1}100%{transform:translateY(-90px) scale(1.4);opacity:0}}
+
+/* Familien-Editor */
+.fam-edit-zeile{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:10px;border-radius:16px;background:rgba(255,255,255,.4);margin-bottom:8px}
+.fam-edit-zeile input[type=text]{width:110px}
+
+@media (max-width:560px){
+  .tab{border-radius:14px 14px 0 0;padding:9px 2px 11px}
+  .wochengrid{grid-template-columns:1fr}
+  .fam-row{margin-left:0}
+}
+</style>
+</head>
+<body>
+<div id="bg"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div></div>
+<div id="grain"></div>
+<div id="hinweis" class="float"></div>
+<div id="app"></div>
+<script>
+"use strict";
+/* =================================================================
+   Familienplaner – Regina · Maik · Emily · Paul
+   Eine Datei, keine Abhängigkeiten. Speicherung: localStorage.
+   ================================================================= */
+
+/* ---------- Hilfen ---------- */
+const $ = s => document.querySelector(s);
+const uid = () => Math.random().toString(36).slice(2, 10);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const heuteKey = () => new Date().toISOString().slice(0, 10);
+const TAGE = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag", "Sonntag"];
+const TAGE_KURZ = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+const heuteIdx = () => (new Date().getDay() + 6) % 7; // Mo=0
+const SLOTS = [
+  { id: "morgens", name: "Morgens", emoji: "☀️" },
+  { id: "mittags", name: "Mittags", emoji: "🌤️" },
+  { id: "abends",  name: "Abends",  emoji: "🌙" }
+];
+const KATEGORIEN = ["🥦 Obst & Gemüse", "🥛 Kühlregal", "🍞 Backwaren", "🥫 Vorrat", "🧼 Haushalt", "🎁 Sonstiges"];
+
+/* ---------- Standarddaten ---------- */
+function standardRoutine(art) {
+  const r = {
+    morgens: [["🦷", "Zähne putzen"], ["👕", "Anziehen"], ["🥣", "Frühstücken"], ["🎒", "Tasche packen"]],
+    mittags: [["🍽️", "Mittag essen"], ["🧸", "Aufräumen"], ["😴", "Ruhezeit"]],
+    abends:  [["🛁", "Baden"], ["🦷", "Zähne putzen"], ["📖", "Buch anschauen"], ["🛏️", "Ins Bett gehen"]]
+  };
+  return r[art].map(([emoji, label]) => ({ id: uid(), emoji, label, done: false }));
+}
+function standardErinnerungen() {
+  return {
+    morgens: { on: false, zeit: "07:00", vorlauf: 10, fired: "" },
+    mittags: { on: false, zeit: "12:30", vorlauf: 10, fired: "" },
+    abends:  { on: false, zeit: "18:30", vorlauf: 10, fired: "" }
+  };
+}
+function standardZustand() {
+  const p = [
+    { id: "regina", name: "Regina", rolle: "Mama",    emoji: "👩", farbe: "#f06ba8", kind: false, sterne: 0 },
+    { id: "maik",   name: "Maik",   rolle: "Papa",    emoji: "👨", farbe: "#4f8df7", kind: false, sterne: 0 },
+    { id: "emily",  name: "Emily",  rolle: "Tochter", emoji: "👧", farbe: "#b06bf0", kind: true,  sterne: 0 },
+    { id: "paul",   name: "Paul",   rolle: "Sohn",    emoji: "👦", farbe: "#3ecb7e", kind: true,  sterne: 0 }
+  ];
+  const essen = {};
+  for (let i = 0; i < 7; i++) essen[i] = { f: "", m: "", a: "" };
+  essen[heuteIdx()].m = "Nudeln mit Tomatensoße";
+  return {
+    version: 3,
+    pin: "1234",
+    aktiverTab: "woche",
+    personen: p,
+    termine: [
+      { id: uid(), tag: heuteIdx(), zeit: "08:00", titel: "Kita bringen", personen: ["emily", "paul"], fahrHin: "maik", fahrZurueck: "regina" },
+      { id: uid(), tag: (heuteIdx() + 1) % 7, zeit: "16:00", titel: "Kinderturnen", personen: ["paul"], fahrHin: "regina", fahrZurueck: "regina" }
+    ],
+    aufgaben: [
+      { id: uid(), titel: "Blumen gießen", person: "regina", freq: "taeglich", done: false, doneDatum: "" },
+      { id: uid(), titel: "Müll rausbringen", person: "maik", freq: "einmal", done: false, doneDatum: "" }
+    ],
+    einkauf: [
+      { id: uid(), name: "Äpfel", menge: "6 Stück", kat: KATEGORIEN[0], done: false },
+      { id: uid(), name: "Milch", menge: "2 L", kat: KATEGORIEN[1], done: false }
+    ],
+    essen,
+    routinen: {
+      emily: { morgens: standardRoutine("morgens"), mittags: standardRoutine("mittags"), abends: standardRoutine("abends") },
+      paul:  { morgens: standardRoutine("morgens"), mittags: standardRoutine("mittags"), abends: standardRoutine("abends") }
+    },
+    erinnerungen: { emily: standardErinnerungen(), paul: standardErinnerungen() },
+    letzterReset: heuteKey()
+  };
+}
+
+/* ---------- Laden / Speichern (400 ms Debounce) ---------- */
+const SPEICHER_KEY = "familienplaner-v3";
+let state;
+try {
+  const roh = localStorage.getItem(SPEICHER_KEY);
+  state = roh ? JSON.parse(roh) : standardZustand();
+  if (!state.personen) state = standardZustand();
+} catch (e) { state = standardZustand(); }
+
+let speicherTimer = null;
+function speichern() {
+  clearTimeout(speicherTimer);
+  speicherTimer = setTimeout(() => {
+    try { localStorage.setItem(SPEICHER_KEY, JSON.stringify(state)); } catch (e) {}
+  }, 400);
+}
+
+/* ---------- UI-Zustand (nicht gespeichert) ---------- */
+const ui = {
+  kindmodus: null,        // Personen-ID oder null
+  kindSlot: aktuellerSlot(),
+  pinOffen: false,
+  pinEingabe: "",
+  bearbeite: null,        // {typ, id}
+  famEditor: false,
+  routKind: "emily",
+  routSlot: aktuellerSlot(),
+  neuFormular: null       // "termin" | "aufgabe" | "einkauf" | "schritt"
+};
+function aktuellerSlot() {
+  const h = new Date().getHours();
+  return h < 11 ? "morgens" : h < 15 ? "mittags" : "abends";
+}
+function person(id) { return state.personen.find(p => p.id === id); }
+function kinder() { return state.personen.filter(p => p.kind); }
+
+/* ---------- Tagesreset ---------- */
+function tagesReset() {
+  const heute = heuteKey();
+  if (state.letzterReset === heute) return;
+  state.letzterReset = heute;
+  Object.values(state.routinen).forEach(slots =>
+    Object.values(slots).forEach(schritte => schritte.forEach(s => { s.done = false; }))
+  );
+  state.aufgaben.forEach(a => {
+    if (a.freq === "taeglich" && a.doneDatum !== heute) { a.done = false; a.doneDatum = ""; }
+  });
+  Object.values(state.erinnerungen).forEach(er =>
+    Object.values(er).forEach(e => { e.fired = ""; })
+  );
+  speichern();
+}
+
+/* =================================================================
+   RENDERN
+   ================================================================= */
+function render() {
+  faerbeBlobs();
+  const app = $("#app");
+  if (ui.kindmodus) { app.innerHTML = renderKindmodus(); return; }
+  app.innerHTML = `
+    ${renderKopf()}
+    ${ui.famEditor ? renderFamEditor() : ""}
+    <div class="tabs">${renderTabs()}</div>
+    <div class="sheet tabpanel">${renderTab()}</div>
+    ${ui.pinOffen ? renderPin() : ""}
+  `;
+}
+function faerbeBlobs() {
+  const b = document.querySelectorAll(".blob");
+  state.personen.slice(0, 4).forEach((p, i) => { if (b[i]) b[i].style.background = p.farbe; });
+}
+function personChip(id) {
+  const p = person(id);
+  if (!p) return "";
+  return `<span class="pill"><span class="pdot" style="background:${p.farbe}"></span>${esc(p.name)}</span>`;
+}
+function personOptionen(gewaehlt, mitLeer) {
+  let o = mitLeer ? `<option value="">–</option>` : "";
+  state.personen.forEach(p => {
+    o += `<option value="${p.id}" ${p.id === gewaehlt ? "selected" : ""}>${p.emoji} ${esc(p.name)}</option>`;
+  });
+  return o;
+}
+
+/* ---------- Kopf ---------- */
+function renderKopf() {
+  const d = new Date();
+  const datum = d.toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  return `<header class="topbar glass">
+    <div class="logo">🏡</div>
+    <div>
+      <h1>Familienplaner</h1>
+      <div class="datum">${datum}</div>
+    </div>
+    <div class="fam-row">
+      ${state.personen.map(p => `
+        <span class="avatar glass" title="${esc(p.rolle)}">
+          <span class="dot" style="background:${p.farbe}55;border:2px solid ${p.farbe}">${p.emoji}</span>
+          ${esc(p.name)}
+          ${p.kind ? `<span class="stars">⭐ ${p.sterne || 0}</span>` : ""}
+          ${p.kind ? `<button class="mini" data-action="kind-start" data-id="${p.id}" title="Kindmodus für ${esc(p.name)} starten">🚀</button>` : ""}
+        </span>`).join("")}
+      <button class="icon-btn glass" data-action="fam-editor" title="Familie & PIN bearbeiten">${ui.famEditor ? "✖️" : "✏️"}</button>
+    </div>
+  </header>`;
+}
+
+/* ---------- Familien-Editor ---------- */
+function renderFamEditor() {
+  return `<div class="glass card" style="margin-bottom:18px">
+    <div class="panel-title"><h2>👨‍👩‍👧‍👦 Familie bearbeiten</h2><span class="sub">Name, Symbol &amp; Farbe je Person · PIN für den Kindmodus</span></div>
+    ${state.personen.map(p => `
+      <div class="fam-edit-zeile">
+        <input type="text" class="emoji-input" id="fe-emoji-${p.id}" value="${esc(p.emoji)}" maxlength="4" title="Symbol">
+        <input type="text" id="fe-name-${p.id}" value="${esc(p.name)}" title="Name">
+        <input type="text" id="fe-rolle-${p.id}" value="${esc(p.rolle)}" style="width:90px" title="Rolle">
+        <input type="color" id="fe-farbe-${p.id}" value="${p.farbe}" title="Farbe">
+        ${p.kind ? `<span class="pill">⭐ ${p.sterne || 0} Sterne <button class="mini" data-action="sterne-null" data-id="${p.id}" title="Sterne zurücksetzen">↺</button></span>` : ""}
+      </div>`).join("")}
+    <div class="hstack" style="margin-top:10px">
+      <span class="muted">🔒 Kindmodus-PIN:</span>
+      <input type="text" id="fe-pin" value="${esc(state.pin)}" maxlength="4" style="width:80px;text-align:center" inputmode="numeric">
+      <span class="grow"></span>
+      <button class="btn" data-action="fam-speichern">Fertig</button>
+    </div>
+  </div>`;
+}
+
+/* ---------- Karteireiter ---------- */
+const TABS = [
+  { id: "woche",    name: "Woche",    icon: "📅" },
+  { id: "aufgaben", name: "Aufgaben", icon: "✅" },
+  { id: "einkauf",  name: "Einkauf",  icon: "🛒" },
+  { id: "essen",    name: "Essen",    icon: "🍽️" },
+  { id: "routinen", name: "Routinen", icon: "🔁" }
+];
+function renderTabs() {
+  return TABS.map(t => `
+    <button class="tab ${state.aktiverTab === t.id ? "aktiv" : ""}" data-action="tab" data-id="${t.id}">
+      <span class="ticon">${t.icon}</span>${t.name}
+    </button>`).join("");
+}
+function renderTab() {
+  switch (state.aktiverTab) {
+    case "woche":    return renderWoche();
+    case "aufgaben": return renderAufgaben();
+    case "einkauf":  return renderEinkauf();
+    case "essen":    return renderEssen();
+    case "routinen": return renderRoutinen();
+  }
+  return "";
+}
+
+/* =================================================================
+   TAB: WOCHE
+   ================================================================= */
+function renderWoche() {
+  const heute = heuteIdx();
+  return `
+    <div class="panel-title">
+      <h2>📅 Wochenkalender</h2><span class="sub">Termine &amp; Fahrdienste der Familie</span>
+      <span class="grow"></span>
+      <button class="btn klein" data-action="neu-formular" data-id="termin">＋ Termin</button>
+    </div>
+    ${ui.neuFormular === "termin" ? terminFormular(null) : ""}
+    <div class="wochengrid">
+      ${TAGE.map((tag, i) => {
+        const termine = state.termine.filter(t => t.tag === i).sort((a, b) => a.zeit.localeCompare(b.zeit));
+        return `<div class="glass tag-card ${i === heute ? "heute" : ""}" style="--heute:${person("maik") ? person("maik").farbe : "#6d78f2"}">
+          <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
+          ${termine.length ? termine.map(t => renderTermin(t)).join("") : `<div class="muted" style="padding:4px 2px">Keine Termine</div>`}
+        </div>`;
+      }).join("")}
+    </div>`;
+}
+function renderTermin(t) {
+  if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id) return terminFormular(t);
+  const erste = person(t.personen[0]);
+  const fahr = [];
+  if (t.fahrHin) fahr.push(`🚗 Hin: ${esc(person(t.fahrHin)?.name || "?")}`);
+  if (t.fahrZurueck) fahr.push(`🏠 Zurück: ${esc(person(t.fahrZurueck)?.name || "?")}`);
+  return `<div class="termin" style="--tc:${erste ? erste.farbe : "#9aa"}">
+    <div class="hstack" style="gap:6px">
+      <span class="zeit">${esc(t.zeit)}</span>
+      <span class="titel grow">${esc(t.titel)}</span>
+      <button class="mini" data-action="edit" data-typ="termin" data-id="${t.id}" title="Bearbeiten">✏️</button>
+      <button class="mini rot" data-action="loeschen" data-typ="termin" data-id="${t.id}" title="Löschen">🗑️</button>
+    </div>
+    <div style="margin-top:5px">${t.personen.map(personChip).join(" ")}</div>
+    ${fahr.length ? `<span class="fahr">${fahr.join(" · ")}</span>` : ""}
+  </div>`;
+}
+function terminFormular(t) {
+  const neu = !t;
+  t = t || { id: "", tag: heuteIdx(), zeit: "15:00", titel: "", personen: [], fahrHin: "", fahrZurueck: "" };
+  return `<div class="glass card" style="margin-bottom:14px">
+    <div class="hstack">
+      <select id="tf-tag">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
+      <input type="time" id="tf-zeit" value="${esc(t.zeit)}">
+      <input type="text" id="tf-titel" class="grow" placeholder="Was steht an?" value="${esc(t.titel)}" style="min-width:150px">
+    </div>
+    <div class="hstack" style="margin-top:9px">
+      <span class="muted">Wer:</span>
+      ${state.personen.map(p => `<label class="pill" style="cursor:pointer"><input type="checkbox" class="tf-person" value="${p.id}" ${t.personen.includes(p.id) ? "checked" : ""} style="accent-color:${p.farbe}"> ${p.emoji} ${esc(p.name)}</label>`).join("")}
+    </div>
+    <div class="hstack" style="margin-top:9px">
+      <span class="muted">🚗 Fahrdienst hin:</span><select id="tf-hin">${personOptionen(t.fahrHin, true)}</select>
+      <span class="muted">zurück:</span><select id="tf-zurueck">${personOptionen(t.fahrZurueck, true)}</select>
+      <span class="grow"></span>
+      <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+      <button class="btn klein" data-action="termin-speichern" data-id="${t.id}" data-neu="${neu}">Fertig</button>
+    </div>
+  </div>`;
+}
+
+/* =================================================================
+   TAB: AUFGABEN
+   ================================================================= */
+function renderAufgaben() {
+  const offen = state.aufgaben.filter(a => !a.done);
+  const erledigt = state.aufgaben.filter(a => a.done);
+  return `
+    <div class="panel-title">
+      <h2>✅ Aufgaben</h2><span class="sub">${offen.length} offen · tägliche Aufgaben starten jeden Morgen neu</span>
+      <span class="grow"></span>
+      <button class="btn klein" data-action="neu-formular" data-id="aufgabe">＋ Aufgabe</button>
+    </div>
+    ${ui.neuFormular === "aufgabe" ? aufgabeFormular(null) : ""}
+    ${state.aufgaben.length ? "" : `<div class="leer">Noch keine Aufgaben – lege die erste an! 🎉</div>`}
+    ${offen.map(a => renderAufgabe(a)).join("")}
+    ${erledigt.length ? `<div class="muted" style="margin:14px 0 8px">Erledigt heute</div>` + erledigt.map(a => renderAufgabe(a)).join("") : ""}
+  `;
+}
+function renderAufgabe(a) {
+  if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id) return aufgabeFormular(a);
+  return `<div class="glass card hstack">
+    <button class="check ${a.done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}">✔</button>
+    <span class="grow ${a.done ? "durch" : ""}" style="font-weight:800">${esc(a.titel)}</span>
+    ${a.freq === "taeglich" ? `<span class="pill">🔁 täglich</span>` : ""}
+    ${personChip(a.person)}
+    <button class="mini" data-action="edit" data-typ="aufgabe" data-id="${a.id}">✏️</button>
+    <button class="mini rot" data-action="loeschen" data-typ="aufgabe" data-id="${a.id}">🗑️</button>
+  </div>`;
+}
+function aufgabeFormular(a) {
+  const neu = !a;
+  a = a || { id: "", titel: "", person: state.personen[0].id, freq: "einmal" };
+  return `<div class="glass card hstack">
+    <input type="text" id="af-titel" class="grow" placeholder="Was ist zu tun?" value="${esc(a.titel)}" style="min-width:150px">
+    <select id="af-person">${personOptionen(a.person, false)}</select>
+    <select id="af-freq">
+      <option value="einmal" ${a.freq === "einmal" ? "selected" : ""}>Einmalig</option>
+      <option value="taeglich" ${a.freq === "taeglich" ? "selected" : ""}>🔁 Täglich</option>
+    </select>
+    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+    <button class="btn klein" data-action="aufgabe-speichern" data-id="${a.id}" data-neu="${neu}">Fertig</button>
+  </div>`;
+}
+
+/* =================================================================
+   TAB: EINKAUF
+   ================================================================= */
+function renderEinkauf() {
+  const offen = state.einkauf.filter(e => !e.done).length;
+  const kats = KATEGORIEN.filter(k => state.einkauf.some(e => e.kat === k));
+  return `
+    <div class="panel-title">
+      <h2>🛒 Einkaufsliste</h2><span class="sub">${offen} Artikel offen</span>
+      <span class="grow"></span>
+      ${state.einkauf.some(e => e.done) ? `<button class="btn soft klein" data-action="einkauf-aufraeumen">Erledigte entfernen</button>` : ""}
+      <button class="btn klein" data-action="neu-formular" data-id="einkauf">＋ Artikel</button>
+    </div>
+    ${ui.neuFormular === "einkauf" ? einkaufFormular(null) : ""}
+    ${state.einkauf.length ? "" : `<div class="leer">Die Liste ist leer – alles im Haus! 🧺</div>`}
+    ${kats.map(k => `
+      <div class="muted" style="margin:12px 0 7px">${esc(k)}</div>
+      ${state.einkauf.filter(e => e.kat === k).map(e => renderArtikel(e)).join("")}
+    `).join("")}
+  `;
+}
+function renderArtikel(e) {
+  if (ui.bearbeite && ui.bearbeite.typ === "einkauf" && ui.bearbeite.id === e.id) return einkaufFormular(e);
+  return `<div class="glass card hstack" style="padding:10px 14px">
+    <button class="check ${e.done ? "an" : ""}" data-action="einkauf-toggle" data-id="${e.id}">✔</button>
+    <span class="grow ${e.done ? "durch" : ""}" style="font-weight:800">${esc(e.name)}</span>
+    ${e.menge ? `<span class="pill">${esc(e.menge)}</span>` : ""}
+    <button class="mini" data-action="edit" data-typ="einkauf" data-id="${e.id}">✏️</button>
+    <button class="mini rot" data-action="loeschen" data-typ="einkauf" data-id="${e.id}">🗑️</button>
+  </div>`;
+}
+function einkaufFormular(e) {
+  const neu = !e;
+  e = e || { id: "", name: "", menge: "", kat: KATEGORIEN[0] };
+  return `<div class="glass card hstack">
+    <input type="text" id="ef-name" class="grow" placeholder="Artikel" value="${esc(e.name)}" style="min-width:130px">
+    <input type="text" id="ef-menge" placeholder="Menge" value="${esc(e.menge)}" style="width:100px">
+    <select id="ef-kat">${KATEGORIEN.map(k => `<option ${k === e.kat ? "selected" : ""}>${k}</option>`).join("")}</select>
+    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+    <button class="btn klein" data-action="einkauf-speichern" data-id="${e.id}" data-neu="${neu}">Fertig</button>
+  </div>`;
+}
+
+/* =================================================================
+   TAB: ESSEN
+   ================================================================= */
+function renderEssen() {
+  const heute = heuteIdx();
+  return `
+    <div class="panel-title"><h2>🍽️ Essensplan</h2><span class="sub">Zum Bearbeiten einfach in ein Feld tippen – wird automatisch gespeichert</span></div>
+    <div class="wochengrid">
+      ${TAGE.map((tag, i) => `
+        <div class="glass tag-card ${i === heute ? "heute" : ""}">
+          <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
+          ${[["f", "🥐 Frühstück"], ["m", "🍲 Mittag"], ["a", "🌙 Abend"]].map(([feld, label]) => `
+            <div style="margin-bottom:7px">
+              <div class="muted" style="font-size:.68rem;margin-bottom:2px">${label}</div>
+              <input type="text" class="essen-feld" data-tag="${i}" data-feld="${feld}" value="${esc(state.essen[i][feld])}" placeholder="…" style="width:100%">
+            </div>`).join("")}
+        </div>`).join("")}
+    </div>`;
+}
+
+/* =================================================================
+   TAB: ROUTINEN (Eltern-Ansicht + Erinnerungen)
+   ================================================================= */
+function renderRoutinen() {
+  const kids = kinder();
+  if (!kids.length) return `<div class="leer">Keine Kinder angelegt.</div>`;
+  if (!state.routinen[ui.routKind]) ui.routKind = kids[0].id;
+  const kind = person(ui.routKind);
+  const schritte = state.routinen[ui.routKind][ui.routSlot];
+  const er = state.erinnerungen[ui.routKind][ui.routSlot];
+  return `
+    <div class="panel-title">
+      <h2>🔁 Routinen</h2><span class="sub">Schritte je Kind &amp; Tageszeit · Kinder haken im Kindmodus ab</span>
+      <span class="grow"></span>
+      <button class="btn klein" data-action="kind-start" data-id="${kind.id}">🚀 Kindmodus: ${esc(kind.name)}</button>
+    </div>
+    <div class="slot-tabs">
+      ${kids.map(k => `<button class="slot-tab ${k.id === ui.routKind ? "aktiv" : ""}" data-action="rout-kind" data-id="${k.id}">${k.emoji} ${esc(k.name)}</button>`).join("")}
+      <span style="width:14px"></span>
+      ${SLOTS.map(s => `<button class="slot-tab ${s.id === ui.routSlot ? "aktiv" : ""}" data-action="rout-slot" data-id="${s.id}">${s.emoji} ${s.name}</button>`).join("")}
+    </div>
+    ${schritte.map(s => renderSchritt(s)).join("")}
+    ${ui.neuFormular === "schritt" ? schrittFormular(null) : `<button class="btn soft klein" data-action="neu-formular" data-id="schritt" style="margin-top:4px">＋ Schritt hinzufügen</button>`}
+    <div class="glass card" style="margin-top:16px">
+      <div class="hstack">
+        <b>⏰ Erinnerung ${SLOTS.find(s => s.id === ui.routSlot).name.toLowerCase()} für ${esc(kind.name)}</b>
+        <span class="grow"></span>
+        <label class="pill" style="cursor:pointer"><input type="checkbox" id="er-an" ${er.on ? "checked" : ""}> aktiv</label>
+      </div>
+      <div class="hstack" style="margin-top:9px">
+        <span class="muted">Uhrzeit:</span><input type="time" id="er-zeit" value="${esc(er.zeit)}">
+        <span class="muted">Vorlauf:</span><input type="number" id="er-vorlauf" value="${er.vorlauf}" min="0" max="120" style="width:70px"> <span class="muted">Min.</span>
+        <span class="grow"></span>
+        <button class="btn klein" data-action="erinnerung-speichern">Fertig</button>
+      </div>
+      <div class="muted" style="margin-top:8px">🔔 Hinweis: Erinnerungen klingeln nur, solange der Planer im Browser geöffnet ist.</div>
+    </div>`;
+}
+function renderSchritt(s) {
+  if (ui.bearbeite && ui.bearbeite.typ === "schritt" && ui.bearbeite.id === s.id) return schrittFormular(s);
+  return `<div class="glass card hstack" style="padding:10px 14px">
+    <span style="font-size:1.4rem">${esc(s.emoji)}</span>
+    <span class="grow ${s.done ? "durch" : ""}" style="font-weight:800">${esc(s.label)}</span>
+    ${s.done ? `<span class="pill">✔ heute geschafft</span>` : ""}
+    <button class="mini" data-action="schritt-hoch" data-id="${s.id}" title="Nach oben">▲</button>
+    <button class="mini" data-action="edit" data-typ="schritt" data-id="${s.id}">✏️</button>
+    <button class="mini rot" data-action="loeschen" data-typ="schritt" data-id="${s.id}">🗑️</button>
+  </div>`;
+}
+function schrittFormular(s) {
+  const neu = !s;
+  s = s || { id: "", emoji: "⭐", label: "" };
+  return `<div class="glass card hstack">
+    <input type="text" id="sf-emoji" class="emoji-input" value="${esc(s.emoji)}" maxlength="4" title="Emoji">
+    <input type="text" id="sf-label" class="grow" placeholder="Was soll gemacht werden?" value="${esc(s.label)}" style="min-width:150px">
+    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+    <button class="btn klein" data-action="schritt-speichern" data-id="${s.id}" data-neu="${neu}">Fertig</button>
+  </div>`;
+}
+
+/* =================================================================
+   KINDMODUS
+   ================================================================= */
+function renderKindmodus() {
+  const kind = person(ui.kindmodus);
+  const schritte = state.routinen[kind.id][ui.kindSlot];
+  const fertig = schritte.filter(s => s.done).length;
+  const alle = schritte.length;
+  const prozent = alle ? Math.round(fertig / alle * 100) : 0;
+  const wolken = [
+    { t: "8%", w: 130, h: 44, d: 65 }, { t: "18%", w: 90, h: 32, d: 48 }, { t: "30%", w: 160, h: 52, d: 80 }
+  ].map((w, i) => `<div class="wolke" style="top:${w.t};width:${w.w}px;height:${w.h}px;animation-duration:${w.d}s;animation-delay:-${i * 17}s"></div>`).join("");
+  return `<div id="kidmode" style="--kc:${kind.farbe}">
+    <div class="sonne"></div>${wolken}
+    <div class="kid-inhalt">
+      <div class="kid-kopf float">
+        <span style="font-size:2.2rem">${kind.emoji}</span>
+        <span class="kname" style="color:${kind.farbe}">${esc(kind.name)}</span>
+        <span class="kid-sterne">⭐ ${kind.sterne || 0}</span>
+      </div>
+      <div class="kid-slots">
+        ${SLOTS.map(s => `<button class="kid-slot ${s.id === ui.kindSlot ? "aktiv" : ""}" data-action="kid-slot" data-id="${s.id}"><span class="se">${s.emoji}</span>${s.name}</button>`).join("")}
+      </div>
+      <div class="kid-fortschritt"><div style="width:${prozent}%"></div></div>
+      <div class="tile-grid">
+        ${schritte.map(s => `
+          <button class="tile ${s.done ? "fertig" : ""}" data-action="kid-schritt" data-id="${s.id}">
+            <span class="tile-in">
+              <span class="tface"><span class="temoji">${esc(s.emoji)}</span><span class="tlabel">${esc(s.label)}</span></span>
+              <span class="tface hinten"><span class="temoji">👍</span></span>
+            </span>
+          </button>`).join("")}
+      </div>
+      ${alle && fertig === alle ? `<div class="kid-fertig-banner">🎉 Super gemacht, ${esc(kind.name)}! Alles geschafft! 🎉</div>` : ""}
+    </div>
+    <button class="kid-exit float" data-action="pin-oeffnen" title="Kindmodus beenden (PIN)">🔒</button>
+    ${ui.pinOffen ? renderPin() : ""}
+  </div>`;
+}
+
+/* ---------- PIN-Pad ---------- */
+function renderPin() {
+  const punkte = [0, 1, 2, 3].map(i => `<span class="${i < ui.pinEingabe.length ? "voll" : ""}"></span>`).join("");
+  const tasten = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "✖", "0", "⌫"];
+  return `<div id="pin-overlay">
+    <div class="pin-box float" id="pin-box">
+      <h3>🔒 PIN eingeben</h3>
+      <div class="muted">Nur für Mama &amp; Papa</div>
+      <div class="pin-punkte">${punkte}</div>
+      <div class="pin-grid">
+        ${tasten.map(t => `<button class="pin-taste" data-action="pin-taste" data-id="${t}">${t}</button>`).join("")}
+      </div>
+    </div>
+  </div>`;
+}
+function pinTaste(t) {
+  if (t === "✖") { ui.pinOffen = false; ui.pinEingabe = ""; render(); return; }
+  if (t === "⌫") { ui.pinEingabe = ui.pinEingabe.slice(0, -1); render(); return; }
+  if (ui.pinEingabe.length >= 4) return;
+  ui.pinEingabe += t;
+  if (ui.pinEingabe.length === 4) {
+    if (ui.pinEingabe === state.pin) {
+      ui.pinOffen = false; ui.pinEingabe = ""; ui.kindmodus = null; render();
+    } else {
+      ui.pinEingabe = "";
+      render();
+      const box = $("#pin-box");
+      if (box) box.classList.add("falsch");
+    }
+  } else render();
+}
+
+/* =================================================================
+   EFFEKTE: Konfetti, Sternflug, Klang
+   ================================================================= */
+function konfetti() {
+  const farben = state.personen.map(p => p.farbe).concat(["#ffd75e", "#7de3f4"]);
+  for (let i = 0; i < 60; i++) {
+    const k = document.createElement("div");
+    k.className = "konfetti";
+    k.style.left = Math.random() * 100 + "vw";
+    k.style.width = 6 + Math.random() * 8 + "px";
+    k.style.height = 8 + Math.random() * 10 + "px";
+    k.style.background = farben[i % farben.length];
+    k.style.animationDuration = 2 + Math.random() * 2.4 + "s";
+    k.style.animationDelay = Math.random() * .6 + "s";
+    document.body.appendChild(k);
+    setTimeout(() => k.remove(), 5200);
+  }
+}
+function sternFlug(x, y) {
+  const s = document.createElement("div");
+  s.className = "sternflug";
+  s.textContent = "⭐";
+  s.style.left = x + "px"; s.style.top = y + "px";
+  document.body.appendChild(s);
+  setTimeout(() => s.remove(), 1000);
+}
+let audioCtx = null;
+function klang(art) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    const noten = art === "erinnerung" ? [[880, 0, .18], [660, .2, .18], [880, .4, .3]] : [[660, 0, .1], [880, .1, .16]];
+    noten.forEach(([freq, start, dauer]) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(.001, audioCtx.currentTime + start);
+      g.gain.exponentialRampToValueAtTime(.22, audioCtx.currentTime + start + .02);
+      g.gain.exponentialRampToValueAtTime(.001, audioCtx.currentTime + start + dauer);
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start(audioCtx.currentTime + start); o.stop(audioCtx.currentTime + start + dauer + .05);
+    });
+  } catch (e) {}
+}
+let hinweisTimer = null;
+function hinweis(text) {
+  const h = $("#hinweis");
+  h.innerHTML = text;
+  h.classList.add("sichtbar");
+  clearTimeout(hinweisTimer);
+  hinweisTimer = setTimeout(() => h.classList.remove("sichtbar"), 8000);
+}
+
+/* =================================================================
+   ERINNERUNGEN (alle 30 s prüfen, solange die Seite offen ist)
+   ================================================================= */
+function pruefeErinnerungen() {
+  tagesReset();
+  const jetzt = new Date();
+  const minutenJetzt = jetzt.getHours() * 60 + jetzt.getMinutes();
+  const heute = heuteKey();
+  kinder().forEach(kind => {
+    SLOTS.forEach(slot => {
+      const er = state.erinnerungen[kind.id] && state.erinnerungen[kind.id][slot.id];
+      if (!er || !er.on || er.fired === heute) return;
+      const [h, m] = er.zeit.split(":").map(Number);
+      const ziel = h * 60 + m - (er.vorlauf || 0);
+      if (minutenJetzt >= ziel && minutenJetzt <= ziel + 30) {
+        er.fired = heute;
+        speichern();
+        klang("erinnerung");
+        hinweis(`🔔 <b>${esc(kind.name)}</b>: Gleich ist ${slot.name.toLowerCase()}-Routine! ${slot.emoji}`);
+      }
+    });
+  });
+}
+
+/* =================================================================
+   AKTIONEN (Event-Delegation)
+   ================================================================= */
+function leseWert(id) { const el = $("#" + id); return el ? el.value.trim() : ""; }
+
+const aktionen = {
+  "tab": id => { state.aktiverTab = id; ui.bearbeite = null; ui.neuFormular = null; speichern(); render(); },
+  "fam-editor": () => { ui.famEditor = !ui.famEditor; render(); },
+  "fam-speichern": () => {
+    state.personen.forEach(p => {
+      p.emoji = leseWert("fe-emoji-" + p.id) || p.emoji;
+      p.name = leseWert("fe-name-" + p.id) || p.name;
+      p.rolle = leseWert("fe-rolle-" + p.id) || p.rolle;
+      const f = $("#fe-farbe-" + p.id); if (f) p.farbe = f.value;
+    });
+    const pin = leseWert("fe-pin");
+    if (/^\d{4}$/.test(pin)) state.pin = pin;
+    ui.famEditor = false; speichern(); render();
+  },
+  "sterne-null": id => { const p = person(id); if (p) p.sterne = 0; speichern(); render(); },
+  "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; render(); },
+  "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; render(); },
+  "edit": (id, typ) => { ui.bearbeite = { typ, id }; ui.neuFormular = null; render(); },
+  "loeschen": (id, typ) => {
+    if (typ === "termin") state.termine = state.termine.filter(t => t.id !== id);
+    if (typ === "aufgabe") state.aufgaben = state.aufgaben.filter(a => a.id !== id);
+    if (typ === "einkauf") state.einkauf = state.einkauf.filter(e => e.id !== id);
+    if (typ === "schritt") {
+      const s = state.routinen[ui.routKind][ui.routSlot];
+      state.routinen[ui.routKind][ui.routSlot] = s.filter(x => x.id !== id);
+    }
+    speichern(); render();
+  },
+
+  "termin-speichern": (id, typ, neu) => {
+    const daten = {
+      tag: parseInt(leseWert("tf-tag"), 10) || 0,
+      zeit: leseWert("tf-zeit") || "12:00",
+      titel: leseWert("tf-titel") || "Termin",
+      personen: Array.from(document.querySelectorAll(".tf-person:checked")).map(c => c.value),
+      fahrHin: leseWert("tf-hin"),
+      fahrZurueck: leseWert("tf-zurueck")
+    };
+    if (neu === "true") state.termine.push({ id: uid(), ...daten });
+    else Object.assign(state.termine.find(t => t.id === id) || {}, daten);
+    ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
+  },
+  "aufgabe-toggle": id => {
+    const a = state.aufgaben.find(x => x.id === id);
+    if (a) { a.done = !a.done; a.doneDatum = a.done ? heuteKey() : ""; if (a.done) klang("check"); }
+    speichern(); render();
+  },
+  "aufgabe-speichern": (id, typ, neu) => {
+    const daten = { titel: leseWert("af-titel") || "Aufgabe", person: leseWert("af-person"), freq: leseWert("af-freq") };
+    if (neu === "true") state.aufgaben.push({ id: uid(), done: false, doneDatum: "", ...daten });
+    else Object.assign(state.aufgaben.find(a => a.id === id) || {}, daten);
+    ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
+  },
+  "einkauf-toggle": id => {
+    const e = state.einkauf.find(x => x.id === id);
+    if (e) { e.done = !e.done; if (e.done) klang("check"); }
+    speichern(); render();
+  },
+  "einkauf-speichern": (id, typ, neu) => {
+    const daten = { name: leseWert("ef-name") || "Artikel", menge: leseWert("ef-menge"), kat: leseWert("ef-kat") || KATEGORIEN[0] };
+    if (neu === "true") state.einkauf.push({ id: uid(), done: false, ...daten });
+    else Object.assign(state.einkauf.find(e => e.id === id) || {}, daten);
+    ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
+  },
+  "einkauf-aufraeumen": () => { state.einkauf = state.einkauf.filter(e => !e.done); speichern(); render(); },
+
+  "rout-kind": id => { ui.routKind = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
+  "rout-slot": id => { ui.routSlot = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
+  "schritt-hoch": id => {
+    const s = state.routinen[ui.routKind][ui.routSlot];
+    const i = s.findIndex(x => x.id === id);
+    if (i > 0) { [s[i - 1], s[i]] = [s[i], s[i - 1]]; speichern(); render(); }
+  },
+  "schritt-speichern": (id, typ, neu) => {
+    const daten = { emoji: leseWert("sf-emoji") || "⭐", label: leseWert("sf-label") || "Schritt" };
+    if (neu === "true") state.routinen[ui.routKind][ui.routSlot].push({ id: uid(), done: false, ...daten });
+    else Object.assign(state.routinen[ui.routKind][ui.routSlot].find(s => s.id === id) || {}, daten);
+    ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
+  },
+  "erinnerung-speichern": () => {
+    const er = state.erinnerungen[ui.routKind][ui.routSlot];
+    er.on = !!($("#er-an") && $("#er-an").checked);
+    er.zeit = leseWert("er-zeit") || er.zeit;
+    er.vorlauf = parseInt(leseWert("er-vorlauf"), 10) || 0;
+    er.fired = "";
+    speichern(); render();
+    hinweis(er.on ? "🔔 Erinnerung gespeichert!" : "🔕 Erinnerung ausgeschaltet.");
+  },
+
+  "kind-start": id => { ui.kindmodus = id; ui.kindSlot = aktuellerSlot(); ui.famEditor = false; render(); },
+  "kid-slot": id => { ui.kindSlot = id; render(); },
+  "kid-schritt": (id, typ, neu, ev) => {
+    const kind = person(ui.kindmodus);
+    const s = state.routinen[kind.id][ui.kindSlot].find(x => x.id === id);
+    if (!s || s.done) return; // Kinder können nichts aus Versehen zurücknehmen
+    s.done = true;
+    kind.sterne = (kind.sterne || 0) + 1;
+    klang("check");
+    if (ev) sternFlug(ev.clientX - 10, ev.clientY - 10);
+    const alle = state.routinen[kind.id][ui.kindSlot];
+    if (alle.every(x => x.done)) { kind.sterne += 3; konfetti(); klang("erinnerung"); }
+    speichern(); render();
+  },
+  "pin-oeffnen": () => { ui.pinOffen = true; ui.pinEingabe = ""; render(); },
+  "pin-taste": id => pinTaste(id)
+};
+
+document.addEventListener("click", ev => {
+  const ziel = ev.target.closest("[data-action]");
+  if (!ziel) return;
+  const fn = aktionen[ziel.dataset.action];
+  if (fn) fn(ziel.dataset.id, ziel.dataset.typ, ziel.dataset.neu, ev);
+});
+document.addEventListener("input", ev => {
+  if (ev.target.classList.contains("essen-feld")) {
+    state.essen[ev.target.dataset.tag][ev.target.dataset.feld] = ev.target.value;
+    speichern();
+  }
+});
+document.addEventListener("keydown", ev => {
+  if (!ui.pinOffen) return;
+  if (/^[0-9]$/.test(ev.key)) pinTaste(ev.key);
+  if (ev.key === "Backspace") pinTaste("⌫");
+  if (ev.key === "Escape") pinTaste("✖");
+});
+
+/* ---------- Start ---------- */
+tagesReset();
+render();
+setInterval(pruefeErinnerungen, 30000);
+setInterval(tagesReset, 60000);
+</script>
+</body>
+</html>
