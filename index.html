@@ -7,6 +7,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <style>
 /* ============ Basis ============ */
 *{box-sizing:border-box;min-width:0}
@@ -78,7 +80,7 @@ input,select{font-family:inherit;font-size:.95rem;color:inherit}
 .icon-btn:hover{transform:translateY(-2px) scale(1.05)}
 
 /* Karteireiter */
-.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:0 8px;position:relative;z-index:2}
+.tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;padding:0 8px;position:relative;z-index:2}
 .tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 4px 14px;
   border-radius:20px 20px 0 0;font-weight:800;font-size:clamp(.62rem,1.9vw,.85rem);color:#5d5d78;
   background:rgba(255,255,255,.32);border:1px solid rgba(255,255,255,.5);border-bottom:none;
@@ -121,6 +123,11 @@ input[type=text],input[type=time],input[type=number],select{
   background:rgba(255,255,255,.65);box-shadow:inset 0 1px 3px rgba(35,35,70,.06);font-weight:700}
 input:focus,select:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
 input[type=color]{width:36px;height:36px;border:none;border-radius:10px;padding:0;background:none;cursor:pointer}
+textarea{width:100%;min-height:88px;padding:10px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.75);outline:none;
+  background:rgba(255,255,255,.65);box-shadow:inset 0 1px 3px rgba(35,35,70,.06);
+  font-family:ui-monospace,Consolas,monospace;font-size:.72rem;resize:vertical}
+textarea:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
+.sync-pill{cursor:default}
 .check{width:30px;height:30px;border-radius:10px;flex:none;display:grid;place-items:center;font-size:.95rem;color:transparent;
   background:rgba(255,255,255,.6);box-shadow:inset 0 1px 3px rgba(35,35,70,.12);transition:all .2s ease}
 .check.an{color:#fff;background:linear-gradient(160deg,#4ade80,#22b862);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 4px 10px -3px rgba(34,184,98,.6);
@@ -141,6 +148,16 @@ input[type=color]{width:36px;height:36px;border:none;border-radius:10px;padding:
 .termin .zeit{font-weight:900;font-size:.78rem;color:#4d4d68}
 .termin .titel{font-weight:800;font-size:.86rem}
 .fahr{font-size:.7rem;font-weight:800;color:#5d5d78;background:rgba(130,180,255,.22);border-radius:8px;padding:2px 8px;display:inline-block;margin-top:4px}
+.presse{cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.aufg-trenn{font-size:.64rem;font-weight:900;color:#77778f;letter-spacing:.09em;text-transform:uppercase;margin:10px 0 6px;padding-top:9px;border-top:1.5px dashed rgba(120,120,160,.3)}
+.aufg-zeile{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:12px;margin-bottom:6px;font-weight:800;font-size:.84rem;
+  background:rgba(255,255,255,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px -3px rgba(35,35,70,.14)}
+.aufg-zeile.aus{opacity:.62}
+.check.k{width:24px;height:24px;border-radius:8px;font-size:.7rem}
+.kontext-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;border-radius:14px;margin-bottom:7px;font-size:.84rem;
+  background:rgba(255,130,130,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.6),0 4px 12px -4px rgba(220,60,60,.35)}
+.btn.rot{background:linear-gradient(160deg,#f87171,#dc2626);box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 6px 16px -6px rgba(220,38,38,.55)}
+.set-block{margin-top:16px;padding-top:14px;border-top:1px solid rgba(120,120,160,.18)}
 
 /* Routinen / Kindmodus */
 .slot-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
@@ -166,6 +183,8 @@ input[type=color]{width:36px;height:36px;border:none;border-radius:10px;padding:
 .kid-slot{padding:14px 6px;border-radius:20px;text-align:center;font-weight:900;font-size:clamp(.8rem,2.6vw,1rem);
   background:rgba(255,255,255,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 6px 16px -6px rgba(35,35,70,.2);transition:all .2s}
 .kid-slot .se{font-size:clamp(1.6rem,5vw,2.2rem);display:block;margin-bottom:2px}
+.kid-slot .zahl{display:block;font-size:clamp(.72rem,2.2vw,.85rem);font-weight:900;margin-top:3px;color:#77778f}
+.kid-slot .zahl.ok{color:#1d7a3f}
 .kid-slot.aktiv{background:linear-gradient(160deg,#ffffffee,#ffffffbb);transform:scale(1.04);
   box-shadow:inset 0 1.5px 0 #fff,0 12px 28px -10px rgba(35,35,70,.35);outline:3px solid var(--kc,#6d78f2)}
 .kid-fortschritt{height:16px;border-radius:999px;background:rgba(255,255,255,.55);box-shadow:inset 0 2px 5px rgba(35,35,70,.15);overflow:hidden;margin-bottom:18px}
@@ -264,7 +283,6 @@ const SLOTS = [
   { id: "mittags", name: "Mittags", emoji: "🌤️" },
   { id: "abends",  name: "Abends",  emoji: "🌙" }
 ];
-const KATEGORIEN = ["🥦 Obst & Gemüse", "🥛 Kühlregal", "🍞 Backwaren", "🥫 Vorrat", "🧼 Haushalt", "🎁 Sonstiges"];
 
 /* ---------- Standarddaten ---------- */
 function standardRoutine(art) {
@@ -302,13 +320,10 @@ function standardZustand() {
       { id: uid(), tag: (heuteIdx() + 1) % 7, zeit: "16:00", titel: "Kinderturnen", personen: ["paul"], fahrHin: "regina", fahrZurueck: "regina" }
     ],
     aufgaben: [
-      { id: uid(), titel: "Blumen gießen", person: "regina", freq: "taeglich", done: false, doneDatum: "" },
-      { id: uid(), titel: "Müll rausbringen", person: "maik", freq: "einmal", done: false, doneDatum: "" }
+      { id: uid(), titel: "Blumen gießen", person: "regina", tag: heuteIdx(), wdh: "taeglich", datum: "", done: false, doneDatum: "" },
+      { id: uid(), titel: "Müll rausbringen", person: "maik", tag: heuteIdx(), wdh: "woechentlich", datum: "", done: false, doneDatum: "" }
     ],
-    einkauf: [
-      { id: uid(), name: "Äpfel", menge: "6 Stück", kat: KATEGORIEN[0], done: false },
-      { id: uid(), name: "Milch", menge: "2 L", kat: KATEGORIEN[1], done: false }
-    ],
+    gerichte: [],
     essen,
     routinen: {
       emily: { morgens: standardRoutine("morgens"), mittags: standardRoutine("mittags"), abends: standardRoutine("abends") },
@@ -326,14 +341,88 @@ try {
   const roh = localStorage.getItem(SPEICHER_KEY);
   state = roh ? JSON.parse(roh) : standardZustand();
   if (!state.personen) state = standardZustand();
+  if (["einkauf", "aufgaben", "routinen"].includes(state.aktiverTab)) state.aktiverTab = "woche";
+  if (!state.gerichte) state.gerichte = [];
+  (state.aufgaben || []).forEach(a => { // Altdaten: freq → wdh/tag
+    if (!a.wdh) {
+      a.wdh = a.freq === "taeglich" ? "taeglich" : "woechentlich";
+      if (typeof a.tag !== "number") a.tag = (new Date().getDay() + 6) % 7;
+      a.datum = "";
+      delete a.freq;
+    }
+  });
 } catch (e) { state = standardZustand(); }
 
 let speicherTimer = null;
 function speichern() {
   clearTimeout(speicherTimer);
   speicherTimer = setTimeout(() => {
+    speicherTimer = null;
     try { localStorage.setItem(SPEICHER_KEY, JSON.stringify(state)); } catch (e) {}
+    syncPush();
   }, 400);
+}
+
+/* =================================================================
+   GERÄTE-SYNC über Firebase Realtime Database (optional)
+   Konfiguration: entweder unten fest eintragen ODER im Planer
+   über ⚙️ → "Geräte-Sync" einfügen (wird lokal gespeichert).
+   ================================================================= */
+const FIREBASE_KONFIG = null; // z.B. { apiKey:"…", databaseURL:"…", … }
+const FB_CFG_KEY = "familienplaner-firebase";
+const fb = { ref: null, verbunden: false, letzterPush: "" };
+
+function firebaseKonfig() {
+  try { const roh = localStorage.getItem(FB_CFG_KEY); if (roh) return JSON.parse(roh); } catch (e) {}
+  return FIREBASE_KONFIG;
+}
+function parseKonfig(text) { // akzeptiert JSON oder das JS-Snippet aus der Firebase-Konsole
+  let t = String(text || "");
+  const i = t.indexOf("{"), j = t.lastIndexOf("}");
+  if (i < 0 || j <= i) return null;
+  t = t.slice(i, j + 1)
+    .replace(/^\s*\/\/[^\n]*$/gm, "")
+    .replace(/'/g, '"')
+    .replace(/([{,]\s*)([A-Za-z0-9_]+)\s*:/g, '$1"$2":')
+    .replace(/,\s*}/g, "}");
+  try { const o = JSON.parse(t); return o.databaseURL ? o : null; } catch (e) { return null; }
+}
+function syncStart() {
+  const cfg = firebaseKonfig();
+  if (!cfg || typeof firebase === "undefined") return;
+  try {
+    firebase.initializeApp(cfg);
+    fb.ref = firebase.database().ref("familienplaner/daten");
+    fb.ref.on("value", snap => {
+      fb.verbunden = true;
+      const remote = snap.val();
+      if (!remote) { fb.letzterPush = ""; syncPush(); syncAnzeige(); return; }
+      const json = JSON.stringify(remote);
+      if (json === fb.letzterPush) { syncAnzeige(); return; }
+      if (speicherTimer) return; // lokale Änderung wird gleich gepusht und gewinnt
+      state = remote;
+      fb.letzterPush = json;
+      try { localStorage.setItem(SPEICHER_KEY, json); } catch (e) {}
+      // Offene Formulare nicht zerstören – dann nur Anzeige aktualisieren
+      if (!ui.bearbeite && !ui.neuFormular && !ui.famEditor && !ui.pinOffen) render();
+      else syncAnzeige();
+    }, () => { fb.verbunden = false; syncAnzeige(); });
+  } catch (e) { fb.verbunden = false; }
+}
+function syncPush() {
+  if (!fb.ref) return;
+  const json = JSON.stringify(state);
+  if (json === fb.letzterPush) return;
+  fb.letzterPush = json;
+  try { fb.ref.set(JSON.parse(json)); } catch (e) {}
+}
+function syncAnzeige() {
+  const el = document.getElementById("sync-status");
+  if (el) el.textContent = syncStatusText();
+}
+function syncStatusText() {
+  if (!firebaseKonfig()) return "⭕ Sync aus";
+  return fb.verbunden ? "☁️ synchron" : "⏳ verbinde…";
 }
 
 /* ---------- UI-Zustand (nicht gespeichert) ---------- */
@@ -343,10 +432,11 @@ const ui = {
   pinOffen: false,
   pinEingabe: "",
   bearbeite: null,        // {typ, id}
+  kontext: null,          // {typ, id} – Löschmenü nach langem Drücken
   famEditor: false,
   routKind: "emily",
   routSlot: aktuellerSlot(),
-  neuFormular: null       // "termin" | "aufgabe" | "einkauf" | "schritt"
+  neuFormular: null       // "termin" | "aufgabe" | "schritt"
 };
 function aktuellerSlot() {
   const h = new Date().getHours();
@@ -364,14 +454,15 @@ function tagesReset() {
     Object.values(slots).forEach(schritte => schritte.forEach(s => { s.done = false; }))
   );
   state.aufgaben.forEach(a => {
-    if (a.freq === "taeglich" && a.doneDatum !== heute) { a.done = false; a.doneDatum = ""; }
+    if ((a.wdh || "woechentlich") !== "einmalig" && a.done && a.doneDatum !== heute) { a.done = false; a.doneDatum = ""; }
   });
   Object.values(state.erinnerungen).forEach(er =>
     Object.values(er).forEach(e => { e.fired = ""; })
   );
-  // Abgelaufene einmalige Termine automatisch entfernen
+  // Abgelaufene einmalige Termine & Aufgaben automatisch entfernen
   const heuteLokal = datumKeyVonTag(heuteIdx());
   state.termine = state.termine.filter(t => (t.wdh || "") !== "einmalig" || !t.datum || t.datum >= heuteLokal);
+  state.aufgaben = state.aufgaben.filter(a => (a.wdh || "") !== "einmalig" || !a.datum || a.datum >= heuteLokal);
   speichern();
 }
 
@@ -425,7 +516,8 @@ function renderKopf() {
           ${p.kind ? `<span class="stars">⭐ ${p.sterne || 0}</span>` : ""}
           ${p.kind ? `<button class="mini" data-action="kind-start" data-id="${p.id}" title="Kindmodus für ${esc(p.name)} starten">🚀</button>` : ""}
         </span>`).join("")}
-      <button class="icon-btn glass" data-action="fam-editor" title="Familie & PIN bearbeiten">${ui.famEditor ? "✖️" : "✏️"}</button>
+      <span class="pill sync-pill" id="sync-status" title="Geräte-Sync – einstellbar über ⚙️">${syncStatusText()}</span>
+      <button class="icon-btn glass" data-action="fam-editor" title="Einstellungen: Familie, Routinen, PIN & Sync">${ui.famEditor ? "✖️" : "⚙️"}</button>
     </div>
   </header>`;
 }
@@ -433,7 +525,7 @@ function renderKopf() {
 /* ---------- Familien-Editor ---------- */
 function renderFamEditor() {
   return `<div class="glass card" style="margin-bottom:18px">
-    <div class="panel-title"><h2>👨‍👩‍👧‍👦 Familie bearbeiten</h2><span class="sub">Name, Symbol &amp; Farbe je Person · PIN für den Kindmodus</span></div>
+    <div class="panel-title"><h2>⚙️ Einstellungen</h2><span class="sub">Familie · Routinen &amp; Erinnerungen · PIN · Geräte-Sync</span></div>
     ${state.personen.map(p => `
       <div class="fam-edit-zeile">
         <input type="text" class="emoji-input" id="fe-emoji-${p.id}" value="${esc(p.emoji)}" maxlength="4" title="Symbol">
@@ -448,16 +540,31 @@ function renderFamEditor() {
       <span class="grow"></span>
       <button class="btn" data-action="fam-speichern">Fertig</button>
     </div>
+    <div class="set-block">
+      <div class="hstack" style="margin-bottom:10px"><b>🔁 Routinen &amp; Erinnerungen</b><span class="muted">Schritte je Kind &amp; Tageszeit · Kinder haken im Kindmodus (🚀) ab</span></div>
+      ${renderRoutinenTeil()}
+    </div>
+    <div class="set-block">
+      <div class="hstack" style="margin-bottom:8px">
+        <b>☁️ Geräte-Sync (Firebase)</b>
+        <span class="pill">${syncStatusText()}</span>
+        <span class="grow"></span>
+        ${firebaseKonfig() ? `<button class="btn soft klein" data-action="sync-trennen">Sync trennen</button>` : ""}
+      </div>
+      <textarea id="fe-fbcfg" placeholder='Firebase-Konfiguration hier einfügen (das Snippet aus der Firebase-Konsole, beginnend mit { "apiKey": … )'>${firebaseKonfig() ? esc(JSON.stringify(firebaseKonfig(), null, 2)) : ""}</textarea>
+      <div class="hstack" style="margin-top:8px">
+        <span class="muted">Gleiche Konfiguration auf jedem Gerät einfügen → alle teilen denselben Stand.</span>
+        <span class="grow"></span>
+        <button class="btn klein" data-action="sync-verbinden">Verbinden</button>
+      </div>
+    </div>
   </div>`;
 }
 
 /* ---------- Karteireiter ---------- */
 const TABS = [
-  { id: "woche",    name: "Woche",    icon: "📅" },
-  { id: "aufgaben", name: "Aufgaben", icon: "✅" },
-  { id: "einkauf",  name: "Einkauf",  icon: "🛒" },
-  { id: "essen",    name: "Essen",    icon: "🍽️" },
-  { id: "routinen", name: "Routinen", icon: "🔁" }
+  { id: "woche", name: "Woche", icon: "📅" },
+  { id: "essen", name: "Essen", icon: "🍽️" }
 ];
 function renderTabs() {
   return TABS.map(t => `
@@ -466,14 +573,8 @@ function renderTabs() {
     </button>`).join("");
 }
 function renderTab() {
-  switch (state.aktiverTab) {
-    case "woche":    return renderWoche();
-    case "aufgaben": return renderAufgaben();
-    case "einkauf":  return renderEinkauf();
-    case "essen":    return renderEssen();
-    case "routinen": return renderRoutinen();
-  }
-  return "";
+  if (state.aktiverTab === "essen") return renderEssen();
+  return renderWoche();
 }
 
 /* =================================================================
@@ -483,22 +584,35 @@ function renderWoche() {
   const heute = heuteIdx();
   return `
     <div class="panel-title">
-      <h2>📅 Wochenkalender</h2><span class="sub">Termine &amp; Fahrdienste der Familie</span>
+      <h2>📅 Wochenkalender</h2><span class="sub">Antippen = bearbeiten · lange drücken = löschen</span>
       <span class="grow"></span>
+      <button class="btn soft klein" data-action="neu-formular" data-id="aufgabe">＋ Aufgabe</button>
       <button class="btn klein" data-action="neu-formular" data-id="termin">＋ Termin</button>
     </div>
     ${ui.neuFormular === "termin" ? terminFormular(null) : ""}
+    ${ui.neuFormular === "aufgabe" ? aufgabeFormular(null) : ""}
     <div class="wochengrid">
       ${TAGE.map((tag, i) => {
         const termine = state.termine.filter(t => passtAufTag(t, i)).sort((a, b) => a.zeit.localeCompare(b.zeit));
+        const aufg = state.aufgaben.filter(a => passtAufTag(a, i));
         return `<div class="glass tag-card ${i === heute ? "heute" : ""}" style="--heute:${person("maik") ? person("maik").farbe : "#6d78f2"}">
           <div class="tag-kopf"><b>${tag}</b>${i === heute ? `<span class="heute-badge">HEUTE</span>` : ""}</div>
-          ${termine.length ? termine.map(t => renderTermin(t)).join("") : `<div class="muted" style="padding:4px 2px">Keine Termine</div>`}
+          ${!termine.length && !aufg.length ? `<div class="muted" style="padding:4px 2px">Nichts geplant</div>` : ""}
+          ${termine.map(t => renderTermin(t)).join("")}
+          ${aufg.length ? `<div class="aufg-trenn">✅ Aufgaben</div>` + aufg.map(a => aufgabeZeile(a)).join("") : ""}
         </div>`;
       }).join("")}
     </div>`;
 }
+function kontextZeile(typ, id, label) {
+  return `<div class="kontext-bar">
+    <span class="grow" style="font-weight:800">„${esc(label)}" löschen?</span>
+    <button class="btn rot klein" data-action="loeschen" data-typ="${typ}" data-id="${id}">🗑️ Löschen</button>
+    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+  </div>`;
+}
 function renderTermin(t) {
+  if (ui.kontext && ui.kontext.typ === "termin" && ui.kontext.id === t.id) return kontextZeile("termin", t.id, t.titel);
   if (ui.bearbeite && ui.bearbeite.typ === "termin" && ui.bearbeite.id === t.id) return terminFormular(t);
   const erste = person(t.personen[0]);
   const fahr = [];
@@ -507,16 +621,26 @@ function renderTermin(t) {
   const wdh = t.wdh || "woechentlich";
   const wdhPill = wdh === "taeglich" ? `<span class="pill">📆 täglich</span>`
     : wdh === "einmalig" ? `<span class="pill">1️⃣ ${formatDatum(t.datum)}</span>` : "";
-  return `<div class="termin" style="--tc:${erste ? erste.farbe : "#9aa"}">
+  return `<div class="termin presse" style="--tc:${erste ? erste.farbe : "#9aa"}" data-action="edit" data-press data-typ="termin" data-id="${t.id}">
     <div class="hstack" style="gap:6px">
       <span class="zeit">${esc(t.zeit)}</span>
       <span class="titel grow">${esc(t.titel)}</span>
       ${wdhPill}
-      <button class="mini" data-action="edit" data-typ="termin" data-id="${t.id}" title="Bearbeiten">✏️</button>
-      <button class="mini rot" data-action="loeschen" data-typ="termin" data-id="${t.id}" title="Löschen">🗑️</button>
     </div>
     <div style="margin-top:5px">${t.personen.map(personChip).join(" ")}</div>
     ${fahr.length ? `<span class="fahr">${fahr.join(" · ")}</span>` : ""}
+  </div>`;
+}
+function aufgabeZeile(a) {
+  if (ui.kontext && ui.kontext.typ === "aufgabe" && ui.kontext.id === a.id) return kontextZeile("aufgabe", a.id, a.titel);
+  if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id) return aufgabeFormular(a);
+  const p = person(a.person);
+  return `<div class="aufg-zeile presse ${a.done ? "aus" : ""}" data-action="edit" data-press data-typ="aufgabe" data-id="${a.id}">
+    <button class="check k ${a.done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}">✔</button>
+    <span class="grow ${a.done ? "durch" : ""}">${esc(a.titel)}</span>
+    ${a.wdh === "taeglich" ? `<span class="pill" style="font-size:.6rem">📆</span>` : ""}
+    ${a.wdh === "einmalig" ? `<span class="pill" style="font-size:.6rem">1️⃣ ${formatDatum(a.datum)}</span>` : ""}
+    ${p ? `<span class="pdot" title="${esc(p.name)}" style="background:${p.farbe}"></span>` : ""}
   </div>`;
 }
 function terminFormular(t) {
@@ -549,90 +673,27 @@ function terminFormular(t) {
   </div>`;
 }
 
-/* =================================================================
-   TAB: AUFGABEN
-   ================================================================= */
-function renderAufgaben() {
-  const offen = state.aufgaben.filter(a => !a.done);
-  const erledigt = state.aufgaben.filter(a => a.done);
-  return `
-    <div class="panel-title">
-      <h2>✅ Aufgaben</h2><span class="sub">${offen.length} offen · tägliche Aufgaben starten jeden Morgen neu</span>
-      <span class="grow"></span>
-      <button class="btn klein" data-action="neu-formular" data-id="aufgabe">＋ Aufgabe</button>
-    </div>
-    ${ui.neuFormular === "aufgabe" ? aufgabeFormular(null) : ""}
-    ${state.aufgaben.length ? "" : `<div class="leer">Noch keine Aufgaben – lege die erste an! 🎉</div>`}
-    ${offen.map(a => renderAufgabe(a)).join("")}
-    ${erledigt.length ? `<div class="muted" style="margin:14px 0 8px">Erledigt heute</div>` + erledigt.map(a => renderAufgabe(a)).join("") : ""}
-  `;
-}
-function renderAufgabe(a) {
-  if (ui.bearbeite && ui.bearbeite.typ === "aufgabe" && ui.bearbeite.id === a.id) return aufgabeFormular(a);
-  return `<div class="glass card hstack">
-    <button class="check ${a.done ? "an" : ""}" data-action="aufgabe-toggle" data-id="${a.id}">✔</button>
-    <span class="grow ${a.done ? "durch" : ""}" style="font-weight:800">${esc(a.titel)}</span>
-    ${a.freq === "taeglich" ? `<span class="pill">🔁 täglich</span>` : ""}
-    ${personChip(a.person)}
-    <button class="mini" data-action="edit" data-typ="aufgabe" data-id="${a.id}">✏️</button>
-    <button class="mini rot" data-action="loeschen" data-typ="aufgabe" data-id="${a.id}">🗑️</button>
-  </div>`;
-}
 function aufgabeFormular(a) {
   const neu = !a;
-  a = a || { id: "", titel: "", person: state.personen[0].id, freq: "einmal" };
-  return `<div class="glass card hstack">
-    <input type="text" id="af-titel" class="grow" placeholder="Was ist zu tun?" value="${esc(a.titel)}" style="min-width:150px">
-    <select id="af-person">${personOptionen(a.person, false)}</select>
-    <select id="af-freq">
-      <option value="einmal" ${a.freq === "einmal" ? "selected" : ""}>Einmalig</option>
-      <option value="taeglich" ${a.freq === "taeglich" ? "selected" : ""}>🔁 Täglich</option>
-    </select>
-    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
-    <button class="btn klein" data-action="aufgabe-speichern" data-id="${a.id}" data-neu="${neu}">Fertig</button>
-  </div>`;
-}
-
-/* =================================================================
-   TAB: EINKAUF
-   ================================================================= */
-function renderEinkauf() {
-  const offen = state.einkauf.filter(e => !e.done).length;
-  const kats = KATEGORIEN.filter(k => state.einkauf.some(e => e.kat === k));
-  return `
-    <div class="panel-title">
-      <h2>🛒 Einkaufsliste</h2><span class="sub">${offen} Artikel offen</span>
-      <span class="grow"></span>
-      ${state.einkauf.some(e => e.done) ? `<button class="btn soft klein" data-action="einkauf-aufraeumen">Erledigte entfernen</button>` : ""}
-      <button class="btn klein" data-action="neu-formular" data-id="einkauf">＋ Artikel</button>
+  a = a || { id: "", titel: "", person: state.personen[0].id, tag: heuteIdx(), wdh: "woechentlich", datum: "" };
+  const wdh = a.wdh || "woechentlich";
+  return `<div class="glass card" style="margin-bottom:10px">
+    <div class="hstack">
+      <select id="af-wdh">
+        <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
+        <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
+        <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
+      </select>
+      <select id="af-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === a.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
+      <input type="date" id="af-datum" value="${esc(a.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">
+      <input type="text" id="af-titel" class="grow" placeholder="Was ist zu tun?" value="${esc(a.titel)}" style="min-width:140px">
+      <select id="af-person">${personOptionen(a.person, false)}</select>
     </div>
-    ${ui.neuFormular === "einkauf" ? einkaufFormular(null) : ""}
-    ${state.einkauf.length ? "" : `<div class="leer">Die Liste ist leer – alles im Haus! 🧺</div>`}
-    ${kats.map(k => `
-      <div class="muted" style="margin:12px 0 7px">${esc(k)}</div>
-      ${state.einkauf.filter(e => e.kat === k).map(e => renderArtikel(e)).join("")}
-    `).join("")}
-  `;
-}
-function renderArtikel(e) {
-  if (ui.bearbeite && ui.bearbeite.typ === "einkauf" && ui.bearbeite.id === e.id) return einkaufFormular(e);
-  return `<div class="glass card hstack" style="padding:10px 14px">
-    <button class="check ${e.done ? "an" : ""}" data-action="einkauf-toggle" data-id="${e.id}">✔</button>
-    <span class="grow ${e.done ? "durch" : ""}" style="font-weight:800">${esc(e.name)}</span>
-    ${e.menge ? `<span class="pill">${esc(e.menge)}</span>` : ""}
-    <button class="mini" data-action="edit" data-typ="einkauf" data-id="${e.id}">✏️</button>
-    <button class="mini rot" data-action="loeschen" data-typ="einkauf" data-id="${e.id}">🗑️</button>
-  </div>`;
-}
-function einkaufFormular(e) {
-  const neu = !e;
-  e = e || { id: "", name: "", menge: "", kat: KATEGORIEN[0] };
-  return `<div class="glass card hstack">
-    <input type="text" id="ef-name" class="grow" placeholder="Artikel" value="${esc(e.name)}" style="min-width:130px">
-    <input type="text" id="ef-menge" placeholder="Menge" value="${esc(e.menge)}" style="width:100px">
-    <select id="ef-kat">${KATEGORIEN.map(k => `<option ${k === e.kat ? "selected" : ""}>${k}</option>`).join("")}</select>
-    <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
-    <button class="btn klein" data-action="einkauf-speichern" data-id="${e.id}" data-neu="${neu}">Fertig</button>
+    <div class="hstack" style="margin-top:9px">
+      <span class="grow"></span>
+      <button class="btn soft klein" data-action="abbrechen">Abbrechen</button>
+      <button class="btn klein" data-action="aufgabe-speichern" data-id="${a.id}" data-neu="${neu}">Fertig</button>
+    </div>
   </div>`;
 }
 
@@ -642,7 +703,11 @@ function einkaufFormular(e) {
 function renderEssen() {
   const heute = heuteIdx();
   return `
-    <div class="panel-title"><h2>🍽️ Essensplan</h2><span class="sub">Zum Bearbeiten einfach in ein Feld tippen – wird automatisch gespeichert</span></div>
+    <div class="panel-title">
+      <h2>🍽️ Essensplan</h2><span class="sub">Einfach ins Feld tippen – Gerichte werden als Favoriten gemerkt und wieder vorgeschlagen</span>
+      <span class="grow"></span>
+      ${state.gerichte.length ? `<button class="btn soft klein" data-action="gerichte-leeren" title="Alle gemerkten Gerichte vergessen">⭐ ${state.gerichte.length} Favoriten leeren</button>` : ""}
+    </div>
     <div class="wochengrid">
       ${TAGE.map((tag, i) => `
         <div class="glass tag-card ${i === heute ? "heute" : ""}">
@@ -650,16 +715,17 @@ function renderEssen() {
           ${[["f", "🥐 Frühstück"], ["m", "🍲 Mittag"], ["a", "🌙 Abend"]].map(([feld, label]) => `
             <div style="margin-bottom:7px">
               <div class="muted" style="font-size:.68rem;margin-bottom:2px">${label}</div>
-              <input type="text" class="essen-feld" data-tag="${i}" data-feld="${feld}" value="${esc(state.essen[i][feld])}" placeholder="…" style="width:100%">
+              <input type="text" class="essen-feld" list="gerichte-dl" data-tag="${i}" data-feld="${feld}" value="${esc(state.essen[i][feld])}" placeholder="…" style="width:100%">
             </div>`).join("")}
         </div>`).join("")}
-    </div>`;
+    </div>
+    <datalist id="gerichte-dl">${state.gerichte.map(g => `<option value="${esc(g)}">`).join("")}</datalist>`;
 }
 
 /* =================================================================
-   TAB: ROUTINEN (Eltern-Ansicht + Erinnerungen)
+   ROUTINEN (in den Einstellungen)
    ================================================================= */
-function renderRoutinen() {
+function renderRoutinenTeil() {
   const kids = kinder();
   if (!kids.length) return `<div class="leer">Keine Kinder angelegt.</div>`;
   if (!state.routinen[ui.routKind]) ui.routKind = kids[0].id;
@@ -667,15 +733,15 @@ function renderRoutinen() {
   const schritte = state.routinen[ui.routKind][ui.routSlot];
   const er = state.erinnerungen[ui.routKind][ui.routSlot];
   return `
-    <div class="panel-title">
-      <h2>🔁 Routinen</h2><span class="sub">Schritte je Kind &amp; Tageszeit · Kinder haken im Kindmodus ab</span>
-      <span class="grow"></span>
-      <button class="btn klein" data-action="kind-start" data-id="${kind.id}">🚀 Kindmodus: ${esc(kind.name)}</button>
-    </div>
     <div class="slot-tabs">
       ${kids.map(k => `<button class="slot-tab ${k.id === ui.routKind ? "aktiv" : ""}" data-action="rout-kind" data-id="${k.id}">${k.emoji} ${esc(k.name)}</button>`).join("")}
       <span style="width:14px"></span>
-      ${SLOTS.map(s => `<button class="slot-tab ${s.id === ui.routSlot ? "aktiv" : ""}" data-action="rout-slot" data-id="${s.id}">${s.emoji} ${s.name}</button>`).join("")}
+      ${SLOTS.map(s => {
+        const st = state.routinen[ui.routKind][s.id];
+        const f = st.filter(x => x.done).length;
+        const stand = st.length ? (f === st.length ? " ✔" : ` ${f}/${st.length}`) : "";
+        return `<button class="slot-tab ${s.id === ui.routSlot ? "aktiv" : ""}" data-action="rout-slot" data-id="${s.id}">${s.emoji} ${s.name}${stand}</button>`;
+      }).join("")}
     </div>
     ${schritte.map(s => renderSchritt(s)).join("")}
     ${ui.neuFormular === "schritt" ? schrittFormular(null) : `<button class="btn soft klein" data-action="neu-formular" data-id="schritt" style="margin-top:4px">＋ Schritt hinzufügen</button>`}
@@ -695,14 +761,13 @@ function renderRoutinen() {
     </div>`;
 }
 function renderSchritt(s) {
+  if (ui.kontext && ui.kontext.typ === "schritt" && ui.kontext.id === s.id) return kontextZeile("schritt", s.id, s.label);
   if (ui.bearbeite && ui.bearbeite.typ === "schritt" && ui.bearbeite.id === s.id) return schrittFormular(s);
-  return `<div class="glass card hstack" style="padding:10px 14px">
+  return `<div class="glass card hstack presse" style="padding:10px 14px${s.done ? ";background:rgba(190,245,205,.45)" : ""}" data-action="edit" data-press data-typ="schritt" data-id="${s.id}">
+    <button class="check ${s.done ? "an" : ""}" data-action="schritt-toggle" data-id="${s.id}" title="${s.done ? "Als offen markieren" : "Abhaken"}">✔</button>
     <span style="font-size:1.4rem">${esc(s.emoji)}</span>
     <span class="grow ${s.done ? "durch" : ""}" style="font-weight:800">${esc(s.label)}</span>
-    ${s.done ? `<span class="pill">✔ heute geschafft</span>` : ""}
     <button class="mini" data-action="schritt-hoch" data-id="${s.id}" title="Nach oben">▲</button>
-    <button class="mini" data-action="edit" data-typ="schritt" data-id="${s.id}">✏️</button>
-    <button class="mini rot" data-action="loeschen" data-typ="schritt" data-id="${s.id}">🗑️</button>
   </div>`;
 }
 function schrittFormular(s) {
@@ -737,7 +802,15 @@ function renderKindmodus() {
         <span class="kid-sterne">⭐ ${kind.sterne || 0}</span>
       </div>
       <div class="kid-slots">
-        ${SLOTS.map(s => `<button class="kid-slot ${s.id === ui.kindSlot ? "aktiv" : ""}" data-action="kid-slot" data-id="${s.id}"><span class="se">${s.emoji}</span>${s.name}</button>`).join("")}
+        ${SLOTS.map(s => {
+          const st = state.routinen[kind.id][s.id];
+          const f = st.filter(x => x.done).length;
+          const komplett = st.length && f === st.length;
+          return `<button class="kid-slot ${s.id === ui.kindSlot ? "aktiv" : ""}" data-action="kid-slot" data-id="${s.id}">
+            <span class="se">${s.emoji}</span>${s.name}
+            <span class="zahl ${komplett ? "ok" : ""}">${komplett ? "✅ fertig!" : f + " / " + st.length}</span>
+          </button>`;
+        }).join("")}
       </div>
       <div class="kid-fortschritt"><div style="width:${prozent}%"></div></div>
       <div class="tile-grid">
@@ -870,7 +943,7 @@ function pruefeErinnerungen() {
 function leseWert(id) { const el = $("#" + id); return el ? el.value.trim() : ""; }
 
 const aktionen = {
-  "tab": id => { state.aktiverTab = id; ui.bearbeite = null; ui.neuFormular = null; speichern(); render(); },
+  "tab": id => { state.aktiverTab = id; ui.bearbeite = null; ui.neuFormular = null; ui.kontext = null; speichern(); render(); },
   "fam-editor": () => { ui.famEditor = !ui.famEditor; render(); },
   "fam-speichern": () => {
     state.personen.forEach(p => {
@@ -884,17 +957,17 @@ const aktionen = {
     ui.famEditor = false; speichern(); render();
   },
   "sterne-null": id => { const p = person(id); if (p) p.sterne = 0; speichern(); render(); },
-  "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; render(); },
-  "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; render(); },
-  "edit": (id, typ) => { ui.bearbeite = { typ, id }; ui.neuFormular = null; render(); },
+  "neu-formular": id => { ui.neuFormular = id; ui.bearbeite = null; ui.kontext = null; render(); },
+  "abbrechen": () => { ui.neuFormular = null; ui.bearbeite = null; ui.kontext = null; render(); },
+  "edit": (id, typ) => { ui.bearbeite = { typ, id }; ui.neuFormular = null; ui.kontext = null; render(); },
   "loeschen": (id, typ) => {
     if (typ === "termin") state.termine = state.termine.filter(t => t.id !== id);
     if (typ === "aufgabe") state.aufgaben = state.aufgaben.filter(a => a.id !== id);
-    if (typ === "einkauf") state.einkauf = state.einkauf.filter(e => e.id !== id);
     if (typ === "schritt") {
       const s = state.routinen[ui.routKind][ui.routSlot];
       state.routinen[ui.routKind][ui.routSlot] = s.filter(x => x.id !== id);
     }
+    ui.kontext = null;
     speichern(); render();
   },
 
@@ -921,26 +994,23 @@ const aktionen = {
     speichern(); render();
   },
   "aufgabe-speichern": (id, typ, neu) => {
-    const daten = { titel: leseWert("af-titel") || "Aufgabe", person: leseWert("af-person"), freq: leseWert("af-freq") };
+    const wdh = leseWert("af-wdh") || "woechentlich";
+    const datum = wdh === "einmalig" ? (leseWert("af-datum") || datumKeyVonTag(heuteIdx())) : "";
+    let tag = parseInt(leseWert("af-tag"), 10) || 0;
+    if (wdh === "einmalig") tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
+    const daten = { titel: leseWert("af-titel") || "Aufgabe", person: leseWert("af-person"), tag, wdh, datum };
     if (neu === "true") state.aufgaben.push({ id: uid(), done: false, doneDatum: "", ...daten });
     else Object.assign(state.aufgaben.find(a => a.id === id) || {}, daten);
     ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
   },
-  "einkauf-toggle": id => {
-    const e = state.einkauf.find(x => x.id === id);
-    if (e) { e.done = !e.done; if (e.done) klang("check"); }
-    speichern(); render();
-  },
-  "einkauf-speichern": (id, typ, neu) => {
-    const daten = { name: leseWert("ef-name") || "Artikel", menge: leseWert("ef-menge"), kat: leseWert("ef-kat") || KATEGORIEN[0] };
-    if (neu === "true") state.einkauf.push({ id: uid(), done: false, ...daten });
-    else Object.assign(state.einkauf.find(e => e.id === id) || {}, daten);
-    ui.neuFormular = null; ui.bearbeite = null; speichern(); render();
-  },
-  "einkauf-aufraeumen": () => { state.einkauf = state.einkauf.filter(e => !e.done); speichern(); render(); },
-
+  "gerichte-leeren": () => { state.gerichte = []; speichern(); render(); hinweis("⭐ Gerichte-Favoriten geleert."); },
   "rout-kind": id => { ui.routKind = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
   "rout-slot": id => { ui.routSlot = id; ui.bearbeite = null; ui.neuFormular = null; render(); },
+  "schritt-toggle": id => {
+    const s = state.routinen[ui.routKind][ui.routSlot].find(x => x.id === id);
+    if (s) { s.done = !s.done; if (s.done) klang("check"); }
+    speichern(); render();
+  },
   "schritt-hoch": id => {
     const s = state.routinen[ui.routKind][ui.routSlot];
     const i = s.findIndex(x => x.id === id);
@@ -962,6 +1032,16 @@ const aktionen = {
     hinweis(er.on ? "🔔 Erinnerung gespeichert!" : "🔕 Erinnerung ausgeschaltet.");
   },
 
+  "sync-verbinden": () => {
+    const cfg = parseKonfig(leseWert("fe-fbcfg"));
+    if (!cfg) { hinweis("⚠️ Konfiguration nicht erkannt – bitte das komplette Snippet aus der Firebase-Konsole einfügen (inkl. databaseURL)."); return; }
+    try { localStorage.setItem(FB_CFG_KEY, JSON.stringify(cfg)); } catch (e) {}
+    location.reload();
+  },
+  "sync-trennen": () => {
+    try { localStorage.removeItem(FB_CFG_KEY); } catch (e) {}
+    location.reload();
+  },
   "kind-start": id => { ui.kindmodus = id; ui.kindSlot = aktuellerSlot(); ui.famEditor = false; render(); },
   "kid-slot": id => { ui.kindSlot = id; render(); },
   "kid-schritt": (id, typ, neu, ev) => {
@@ -981,10 +1061,40 @@ const aktionen = {
 };
 
 document.addEventListener("click", ev => {
+  if (unterdrueckeKlick) { unterdrueckeKlick = false; return; }
   const ziel = ev.target.closest("[data-action]");
   if (!ziel) return;
   const fn = aktionen[ziel.dataset.action];
   if (fn) fn(ziel.dataset.id, ziel.dataset.typ, ziel.dataset.neu, ev);
+});
+
+/* ---------- Langes Drücken = Löschmenü ---------- */
+let pressTimer = null, unterdrueckeKlick = false;
+function pressEnde() { clearTimeout(pressTimer); pressTimer = null; }
+document.addEventListener("pointerdown", ev => {
+  const z = ev.target.closest("[data-press]");
+  if (!z) return;
+  const typ = z.dataset.typ, id = z.dataset.id;
+  pressTimer = setTimeout(() => {
+    pressTimer = null;
+    unterdrueckeKlick = true;
+    ui.kontext = { typ, id };
+    ui.bearbeite = null; ui.neuFormular = null;
+    render();
+  }, 550);
+});
+document.addEventListener("pointerup", pressEnde);
+document.addEventListener("pointercancel", pressEnde);
+document.addEventListener("pointermove", ev => {
+  if (pressTimer && (Math.abs(ev.movementX) + Math.abs(ev.movementY)) > 4) pressEnde();
+});
+document.addEventListener("contextmenu", ev => { // Rechtsklick am PC = gleiches Menü
+  const z = ev.target.closest("[data-press]");
+  if (!z) return;
+  ev.preventDefault();
+  ui.kontext = { typ: z.dataset.typ, id: z.dataset.id };
+  ui.bearbeite = null; ui.neuFormular = null;
+  render();
 });
 document.addEventListener("input", ev => {
   if (ev.target.classList.contains("essen-feld")) {
@@ -993,12 +1103,22 @@ document.addEventListener("input", ev => {
   }
 });
 document.addEventListener("change", ev => {
-  if (ev.target.id === "tf-wdh") {
-    const w = ev.target.value, tagSel = $("#tf-tag"), datum = $("#tf-datum");
+  if (ev.target.id === "tf-wdh" || ev.target.id === "af-wdh") {
+    const p = ev.target.id.slice(0, 2);
+    const w = ev.target.value, tagSel = $("#" + p + "-tag"), datum = $("#" + p + "-datum");
     if (tagSel) tagSel.style.display = w === "woechentlich" ? "" : "none";
     if (datum) datum.style.display = w === "einmalig" ? "" : "none";
   }
+  if (ev.target.classList.contains("essen-feld")) merkeGericht(ev.target.value);
 });
+function merkeGericht(wert) {
+  const g = (wert || "").trim();
+  if (g.length < 2) return;
+  state.gerichte = [g, ...(state.gerichte || []).filter(x => x.toLowerCase() !== g.toLowerCase())].slice(0, 30);
+  const dl = document.getElementById("gerichte-dl");
+  if (dl) dl.innerHTML = state.gerichte.map(x => `<option value="${esc(x)}">`).join("");
+  speichern();
+}
 document.addEventListener("keydown", ev => {
   if (!ui.pinOffen) return;
   if (/^[0-9]$/.test(ev.key)) pinTaste(ev.key);
@@ -1009,6 +1129,7 @@ document.addEventListener("keydown", ev => {
 /* ---------- Start ---------- */
 tagesReset();
 render();
+syncStart();
 setInterval(pruefeErinnerungen, 30000);
 setInterval(tagesReset, 60000);
 /* Version 1.1 – Termine: wöchentlich / täglich / einmalig */
