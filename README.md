@@ -6,7 +6,7 @@ Interaktiver Familienplaner für Regina, Maik, Emily & Paul — eine einzige HTM
 
 | Tab | Funktion |
 |---|---|
-| 📅 Woche | Wochenkalender mit Terminen (wöchentlich, täglich, Mo–Fr oder einmalig mit Datum), Personen-Zuordnung, Fahrdienst (hin/zurück) — plus abhakbare Aufgaben als abgetrennter Bereich in jedem Wochentag |
+| 📅 Woche | Wochenkalender mit Terminen (wöchentlich, täglich, Mo–Fr, monatlich am Tag des Startdatums oder einmalig mit Datum), Personen-Zuordnung, Fahrdienst (hin/zurück) — plus abhakbare Aufgaben als abgetrennter Bereich in jedem Wochentag |
 | 🍽️ Essen | Essensplan (Frühstück/Mittag/Abend) für die ganze Woche — Gerichte werden automatisch als Favoriten gemerkt und wieder vorgeschlagen |
 
 ## Bedienung
@@ -17,7 +17,7 @@ Unter **⚙️ Einstellungen** (oben rechts): Familie (Namen, Farben, Symbole), 
 
 ## 🚀 Kindmodus
 
-Vollbild-Ansicht für Emily und Paul — komplett ohne Lesen: große Emoji-Kacheln, Flip-Animation mit 👍 beim Abhaken, Sterne-Belohnung (⭐ +1 pro Schritt, +3 Bonus mit Konfetti, wenn alles geschafft ist). Beenden nur per 4-stelliger PIN (Standard: `1234`, änderbar über ✏️ oben rechts).
+Vollbild-Ansicht für Emily und Paul — komplett ohne Lesen: große Emoji-Kacheln, Flip-Animation mit 👍 beim Abhaken, Sterne-Belohnung (⭐ +1 pro Schritt, +3 Bonus mit Konfetti, wenn alles geschafft ist). **Wischen nach links/rechts** (oder die Punkte oben antippen) wechselt zwischen den Kindern — das klappt auch im Routinen-Editor der Einstellungen. Beenden nur per 4-stelliger PIN (Standard: `1234`, änderbar über ✏️ oben rechts).
 
 ## Nutzung
 

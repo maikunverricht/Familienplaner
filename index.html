@@ -160,6 +160,11 @@ textarea:focus{border-color:#8b94f5;box-shadow:0 0 0 3px rgba(120,130,245,.22)}
 .set-block{margin-top:16px;padding-top:14px;border-top:1px solid rgba(120,120,160,.18)}
 
 /* Routinen / Kindmodus */
+[data-swipe]{touch-action:pan-y}
+.kid-dots{display:flex;gap:9px;align-items:center;padding:4px 6px}
+.kdot{width:13px;height:13px;border-radius:50%;padding:0;flex:none;
+  background:rgba(35,35,70,.18);box-shadow:inset 0 1px 2px rgba(35,35,70,.2);transition:all .2s}
+.kdot.an{background:var(--kf,#6d78f2);transform:scale(1.35);box-shadow:0 2px 6px rgba(35,35,70,.3)}
 .slot-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .slot-tab{padding:8px 16px;border-radius:999px;font-weight:800;font-size:.82rem;background:rgba(255,255,255,.45);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.8),0 2px 8px -3px rgba(35,35,70,.15);transition:all .15s}
@@ -276,12 +281,21 @@ function datumKeyVonTag(i) { // lokales Datum (JJJJ-MM-TT) des Wochentags i in d
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 const formatDatum = k => k ? k.slice(8, 10) + "." + k.slice(5, 7) + "." : "";
+const monatsTag = t => parseInt((t.datum || "").slice(8, 10), 10) || "?"; // Tag im Monat (aus dem Startdatum)
 function passtAufTag(t, i) {
   if (t.ausnahmen && t.ausnahmen.includes(datumKeyVonTag(i))) return false; // einzelner Tag gelöscht
   const wdh = t.wdh || "woechentlich";
   if (wdh === "taeglich") return true;
   if (wdh === "arbeitstage") return i <= 4; // Montag bis Freitag
   if (wdh === "einmalig") return t.datum === datumKeyVonTag(i);
+  if (wdh === "monatlich") { // jeden Monat am Tag des Startdatums
+    if (!t.datum) return false;
+    const key = datumKeyVonTag(i);
+    if (key < t.datum) return false; // Serie beginnt erst am Startdatum
+    const ziel = parseInt(t.datum.slice(8, 10), 10);
+    const letzter = new Date(parseInt(key.slice(0, 4), 10), parseInt(key.slice(5, 7), 10), 0).getDate();
+    return parseInt(key.slice(8, 10), 10) === Math.min(ziel, letzter); // z.B. 31. → letzter Tag kürzerer Monate
+  }
   return t.tag === i;
 }
 const SLOTS = [
@@ -660,6 +674,7 @@ function renderTermin(t, i) {
   const wdh = t.wdh || "woechentlich";
   const wdhPill = wdh === "taeglich" ? `<span class="pill">📆 täglich</span>`
     : wdh === "arbeitstage" ? `<span class="pill">💼 Mo–Fr</span>`
+    : wdh === "monatlich" ? `<span class="pill">🗓️ jeden ${monatsTag(t)}.</span>`
     : wdh === "einmalig" ? `<span class="pill">1️⃣ ${formatDatum(t.datum)}</span>` : "";
   return `<div class="termin presse" style="--tc:${erste ? erste.farbe : "#9aa"}" data-action="edit" data-press data-typ="termin" data-id="${t.id}" data-tag="${i}">
     <div class="hstack" style="gap:6px">
@@ -682,6 +697,7 @@ function aufgabeZeile(a, tagIdx) {
     <span class="grow ${done ? "durch" : ""}">${esc(a.titel)}</span>
     ${a.wdh === "taeglich" ? `<span class="pill" style="font-size:.6rem">📆</span>` : ""}
     ${a.wdh === "arbeitstage" ? `<span class="pill" style="font-size:.6rem">💼</span>` : ""}
+    ${a.wdh === "monatlich" ? `<span class="pill" style="font-size:.6rem">🗓️ ${monatsTag(a)}.</span>` : ""}
     ${a.wdh === "einmalig" ? `<span class="pill" style="font-size:.6rem">1️⃣ ${formatDatum(a.datum)}</span>` : ""}
     ${p ? `<span class="pdot" title="${esc(p.name)}" style="background:${p.farbe}"></span>` : ""}
   </div>`;
@@ -698,10 +714,11 @@ function terminFormular(t, opt) {
         <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
         <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
         <option value="arbeitstage" ${wdh === "arbeitstage" ? "selected" : ""}>💼 Mo–Fr</option>
+        <option value="monatlich" ${wdh === "monatlich" ? "selected" : ""}>🗓️ Monatlich</option>
         <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
       </select>
       <select id="tf-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === t.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
-      <input type="date" id="tf-datum" value="${esc(t.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">`}
+      <input type="date" id="tf-datum" value="${esc(t.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" || wdh === "monatlich" ? "" : "display:none"}" title="Einmalig: genau dieser Tag · Monatlich: ab diesem Datum, jeden Monat am selben Tag">`}
       <input type="time" id="tf-zeit" value="${esc(t.zeit)}">
       <input type="text" id="tf-titel" class="grow" placeholder="Was steht an?" value="${esc(t.titel)}" style="min-width:150px">
     </div>
@@ -729,10 +746,11 @@ function aufgabeFormular(a) {
         <option value="woechentlich" ${wdh === "woechentlich" ? "selected" : ""}>🔁 Wöchentlich</option>
         <option value="taeglich" ${wdh === "taeglich" ? "selected" : ""}>📆 Täglich</option>
         <option value="arbeitstage" ${wdh === "arbeitstage" ? "selected" : ""}>💼 Mo–Fr</option>
+        <option value="monatlich" ${wdh === "monatlich" ? "selected" : ""}>🗓️ Monatlich</option>
         <option value="einmalig" ${wdh === "einmalig" ? "selected" : ""}>1️⃣ Einmalig</option>
       </select>
       <select id="af-tag" style="${wdh === "woechentlich" ? "" : "display:none"}">${TAGE.map((x, i) => `<option value="${i}" ${i === a.tag ? "selected" : ""}>${x}</option>`).join("")}</select>
-      <input type="date" id="af-datum" value="${esc(a.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" ? "" : "display:none"}">
+      <input type="date" id="af-datum" value="${esc(a.datum || datumKeyVonTag(heuteIdx()))}" style="${wdh === "einmalig" || wdh === "monatlich" ? "" : "display:none"}" title="Einmalig: genau dieser Tag · Monatlich: ab diesem Datum, jeden Monat am selben Tag">
       <input type="text" id="af-titel" class="grow" placeholder="Was ist zu tun?" value="${esc(a.titel)}" style="min-width:140px">
       <select id="af-person">${personOptionen(a.person, false)}</select>
     </div>
@@ -779,7 +797,7 @@ function renderRoutinenTeil() {
   const kind = person(ui.routKind);
   const schritte = state.routinen[ui.routKind][ui.routSlot];
   const er = state.erinnerungen[ui.routKind][ui.routSlot];
-  return `
+  return `<div data-swipe="routinen">
     <div class="slot-tabs">
       ${kids.map(k => `<button class="slot-tab ${k.id === ui.routKind ? "aktiv" : ""}" data-action="rout-kind" data-id="${k.id}">${k.emoji} ${esc(k.name)}</button>`).join("")}
       <span style="width:14px"></span>
@@ -805,7 +823,8 @@ function renderRoutinenTeil() {
         <button class="btn klein" data-action="erinnerung-speichern">Fertig</button>
       </div>
       <div class="muted" style="margin-top:8px">🔔 Hinweis: Erinnerungen klingeln nur, solange der Planer im Browser geöffnet ist.</div>
-    </div>`;
+    </div>
+  </div>`;
 }
 function renderSchritt(s) {
   if (ui.kontext && ui.kontext.typ === "schritt" && ui.kontext.id === s.id) return kontextZeile("schritt", s.id, s.label);
@@ -840,12 +859,15 @@ function renderKindmodus() {
   const wolken = [
     { t: "8%", w: 130, h: 44, d: 65 }, { t: "18%", w: 90, h: 32, d: 48 }, { t: "30%", w: 160, h: 52, d: 80 }
   ].map((w, i) => `<div class="wolke" style="top:${w.t};width:${w.w}px;height:${w.h}px;animation-duration:${w.d}s;animation-delay:-${i * 17}s"></div>`).join("");
-  return `<div id="kidmode" style="--kc:${kind.farbe}">
+  const kids = kinder();
+  return `<div id="kidmode" style="--kc:${kind.farbe}" data-swipe="kindmodus">
     <div class="sonne"></div>${wolken}
     <div class="kid-inhalt">
       <div class="kid-kopf float">
         <span style="font-size:2.2rem">${kind.emoji}</span>
         <span class="kname" style="color:${kind.farbe}">${esc(kind.name)}</span>
+        ${kids.length > 1 ? `<span class="kid-dots" title="Wischen oder tippen = Kind wechseln">${kids.map(k =>
+          `<button class="kdot ${k.id === kind.id ? "an" : ""}" data-action="kind-wechsel" data-id="${k.id}" style="--kf:${k.farbe}" title="${esc(k.name)}"></button>`).join("")}</span>` : ""}
         <span class="kid-sterne">⭐ ${kind.sterne || 0}</span>
       </div>
       <div class="kid-slots">
@@ -1112,9 +1134,9 @@ const aktionen = {
       return;
     }
     const wdh = leseWert("tf-wdh") || "woechentlich";
-    const datum = wdh === "einmalig" ? (leseWert("tf-datum") || datumKeyVonTag(heuteIdx())) : "";
+    const datum = (wdh === "einmalig" || wdh === "monatlich") ? (leseWert("tf-datum") || datumKeyVonTag(heuteIdx())) : "";
     let tag = parseInt(leseWert("tf-tag"), 10) || 0;
-    if (wdh === "einmalig") tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
+    if (datum) tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
     const daten = {
       tag, wdh, datum,
       zeit: leseWert("tf-zeit") || "12:00",
@@ -1138,9 +1160,9 @@ const aktionen = {
   },
   "aufgabe-speichern": (id, typ, neu) => {
     const wdh = leseWert("af-wdh") || "woechentlich";
-    const datum = wdh === "einmalig" ? (leseWert("af-datum") || datumKeyVonTag(heuteIdx())) : "";
+    const datum = (wdh === "einmalig" || wdh === "monatlich") ? (leseWert("af-datum") || datumKeyVonTag(heuteIdx())) : "";
     let tag = parseInt(leseWert("af-tag"), 10) || 0;
-    if (wdh === "einmalig") tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
+    if (datum) tag = (new Date(datum + "T12:00:00").getDay() + 6) % 7;
     const daten = { titel: leseWert("af-titel") || "Aufgabe", person: leseWert("af-person"), tag, wdh, datum };
     if (neu === "true") state.aufgaben.push({ id: uid(), doneDaten: {}, ...daten });
     else Object.assign(state.aufgaben.find(a => a.id === id) || {}, daten);
@@ -1188,6 +1210,7 @@ const aktionen = {
     location.reload();
   },
   "kind-start": id => { ui.kindmodus = id; ui.kindSlot = aktuellerSlot(); ui.famEditor = false; render(); },
+  "kind-wechsel": id => { ui.kindmodus = id; render(); },
   "kid-slot": id => { ui.kindSlot = id; render(); },
   "kid-schritt": (id, typ, neu, ev) => {
     const s = state.routinen[ui.kindmodus][ui.kindSlot].find(x => x.id === id);
@@ -1231,6 +1254,38 @@ document.addEventListener("pointercancel", pressEnde);
 document.addEventListener("pointermove", ev => {
   if (pressTimer && (Math.abs(ev.movementX) + Math.abs(ev.movementY)) > 4) pressEnde();
 });
+/* ---------- Wischen = Kind wechseln (Kindmodus & Routinen-Einstellungen) ---------- */
+let swipeStart = null;
+document.addEventListener("pointerdown", ev => {
+  swipeStart = null;
+  if (!ev.isPrimary || ui.pinOffen) return;
+  if (ev.target.closest("input,textarea,select")) return; // Eingabefelder nicht stören
+  const z = ev.target.closest("[data-swipe]");
+  if (z) swipeStart = { x: ev.clientX, y: ev.clientY, ziel: z.dataset.swipe };
+});
+document.addEventListener("pointerup", ev => {
+  if (!swipeStart) return;
+  const dx = ev.clientX - swipeStart.x, dy = ev.clientY - swipeStart.y;
+  const ziel = swipeStart.ziel;
+  swipeStart = null;
+  if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return; // zu kurz oder eher gescrollt
+  const kids = kinder();
+  if (kids.length < 2) return;
+  const schritt = dx < 0 ? 1 : -1; // nach links wischen = nächstes Kind
+  unterdrueckeKlick = true; // versehentliches Antippen beim Wischen schlucken
+  setTimeout(() => { unterdrueckeKlick = false; }, 400);
+  if (ziel === "kindmodus" && ui.kindmodus) {
+    const i = Math.max(0, kids.findIndex(k => k.id === ui.kindmodus));
+    ui.kindmodus = kids[(i + schritt + kids.length) % kids.length].id;
+  } else if (ziel === "routinen") {
+    const i = Math.max(0, kids.findIndex(k => k.id === ui.routKind));
+    ui.routKind = kids[(i + schritt + kids.length) % kids.length].id;
+    ui.bearbeite = null; ui.neuFormular = null; ui.kontext = null;
+  } else return;
+  render();
+});
+document.addEventListener("pointercancel", () => { swipeStart = null; });
+
 document.addEventListener("contextmenu", ev => { // Rechtsklick am PC = gleiches Menü
   const z = ev.target.closest("[data-press]");
   if (!z) return;
@@ -1250,7 +1305,7 @@ document.addEventListener("change", ev => {
     const p = ev.target.id.slice(0, 2);
     const w = ev.target.value, tagSel = $("#" + p + "-tag"), datum = $("#" + p + "-datum");
     if (tagSel) tagSel.style.display = w === "woechentlich" ? "" : "none";
-    if (datum) datum.style.display = w === "einmalig" ? "" : "none";
+    if (datum) datum.style.display = (w === "einmalig" || w === "monatlich") ? "" : "none";
   }
   if (ev.target.classList.contains("essen-feld")) merkeGericht(ev.target.value);
 });
@@ -1275,7 +1330,7 @@ render();
 syncStart();
 setInterval(pruefeErinnerungen, 30000);
 setInterval(tagesReset, 60000);
-/* Version 1.1 – Termine: wöchentlich / täglich / einmalig */
+/* Version 1.2 – Monatliche Serien (Termine & Aufgaben) · Wischen zwischen den Kinder-Routinen */
 </script>
 </body>
 </html>
